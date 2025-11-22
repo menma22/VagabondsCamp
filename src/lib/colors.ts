@@ -1,0 +1,17 @@
+export const PROJECT_COLORS = [
+  { name: 'スカイブルー', value: '#A5B4C5' },
+  { name: 'ラベンダー', value: '#B8A5C8' },
+  { name: 'ミントグリーン', value: '#A8C5B5' },
+  { name: 'ピーチ', value: '#D9B5A3' },
+  { name: 'ローズピンク', value: '#C9A5B5' },
+  { name: 'セージグリーン', value: '#B5C5A8' },
+  { name: 'ダスティブルー', value: '#8FA8BE' },
+  { name: 'モーヴ', value: '#B8A5B8' },
+  { name: 'テラコッタ', value: '#C8A595' },
+  { name: 'オリーブ', value: '#B5B89F' },
+  { name: 'ライラック', value: '#B5A8C5' },
+  { name: 'ベージュ', value: '#C5B8A5' },
+  { name: 'ダスティローズ', value: '#C8A5A8' },
+  { name: 'ターコイズ', value: '#A5C5C8' },
+  { name: 'グレイッシュブルー', value: '#A5B8C5' },
+];

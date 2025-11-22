@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .tab-smooth {
+    border-radius: 16px 16px 0 0;
+    position: relative;
+  }
+
+  .tab-smooth::before,
+  .tab-smooth::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 16px;
+    height: 16px;
+    background: transparent;
+  }
+
+  .tab-smooth::before {
+    left: -16px;
+    border-bottom-right-radius: 16px;
+    box-shadow: 8px 0 0 0 currentColor;
+  }
+
+  .tab-smooth::after {
+    right: -16px;
+    border-bottom-left-radius: 16px;
+    box-shadow: -8px 0 0 0 currentColor;
+  }
+
+  .tab-smooth.bg-white::before,
+  .tab-smooth.bg-white::after {
+    color: white;
+  }
+
+  .tab-smooth.bg-white\/40::before,
+  .tab-smooth.bg-white\/40::after {
+    display: none;
+  }
+
+  .tab-smooth.tab-colored::before,
+  .tab-smooth.tab-colored::after {
+    color: var(--tab-color);
+  }
+}
