@@ -23,6 +23,7 @@ import {
 interface MeetingPageProps {
   meetingId: string;
   onClose: () => void;
+  onRetryTranscription?: (meetingId: string) => Promise<void>;
 }
 
 interface TodoItem {
@@ -57,9 +58,13 @@ interface MeetingData {
   decisions: DecisionItem[];
   reference_urls: UrlItem[];
   shared_information: SharedInfoItem[];
+  audio_url: string | null;
+  audio_size: number | null;
+  transcription_status: string;
+  transcription_error: string | null;
 }
 
-export function MeetingPage({ meetingId, onClose }: MeetingPageProps) {
+export function MeetingPage({ meetingId, onClose, onRetryTranscription }: MeetingPageProps) {
   const { user } = useAuth();
   const { isRecording, recordingTime, recordingMeetingId, startRecording, stopRecording } = useRecording();
   const [loading, setLoading] = useState(true);
@@ -73,6 +78,10 @@ export function MeetingPage({ meetingId, onClose }: MeetingPageProps) {
     decisions: [],
     reference_urls: [],
     shared_information: [],
+    audio_url: null,
+    audio_size: null,
+    transcription_status: 'pending',
+    transcription_error: null,
   });
   const [processing, setProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState('');
@@ -137,6 +146,10 @@ export function MeetingPage({ meetingId, onClose }: MeetingPageProps) {
         decisions: data.decisions || [],
         reference_urls: data.reference_urls || [],
         shared_information: data.shared_information || [],
+        audio_url: data.audio_url || null,
+        audio_size: data.audio_size || null,
+        transcription_status: data.transcription_status || 'pending',
+        transcription_error: data.transcription_error || null,
       });
     } catch (error) {
       console.error('Error loading meeting:', error);
@@ -573,6 +586,49 @@ ${transcript}`,
             </div>
           )}
         </div>
+
+        {meeting.audio_url && (
+          <div className="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  meeting.transcription_status === 'completed' ? 'bg-green-100' :
+                  meeting.transcription_status === 'failed' ? 'bg-red-100' :
+                  'bg-blue-100'
+                }`}>
+                  <Mic className={`w-5 h-5 ${
+                    meeting.transcription_status === 'completed' ? 'text-green-600' :
+                    meeting.transcription_status === 'failed' ? 'text-red-600' :
+                    'text-blue-600'
+                  }`} />
+                </div>
+                <div>
+                  <div className="font-medium text-slate-900">
+                    音声データ: {meeting.audio_size ? `${(meeting.audio_size / (1024 * 1024)).toFixed(2)} MB` : '不明'}
+                  </div>
+                  <div className={`text-sm ${
+                    meeting.transcription_status === 'completed' ? 'text-green-600' :
+                    meeting.transcription_status === 'failed' ? 'text-red-600' :
+                    'text-blue-600'
+                  }`}>
+                    {meeting.transcription_status === 'completed' && '文字起こし完了'}
+                    {meeting.transcription_status === 'failed' && `文字起こし失敗: ${meeting.transcription_error || '不明なエラー'}`}
+                    {meeting.transcription_status === 'processing' && '処理中...'}
+                  </div>
+                </div>
+              </div>
+              {meeting.transcription_status === 'failed' && onRetryTranscription && (
+                <button
+                  onClick={() => onRetryTranscription(meetingId)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Loader2 className="w-4 h-4" />
+                  再試行
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <ActionItems items={meeting.todos} onUpdate={updateTodos} />

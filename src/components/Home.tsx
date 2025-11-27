@@ -284,8 +284,12 @@ export function Home() {
     }
   };
 
-  const processRecording = async (segments: Blob[]) => {
+  const processRecording = async (segments: Blob[], meetingId?: string) => {
     setProcessing(true);
+
+    let audioUrl: string | null = null;
+    let audioSize: number | null = null;
+    let tempMeetingId: string | null = meetingId || null;
 
     try {
       console.log('=== Starting processRecording ===');
@@ -302,6 +306,46 @@ export function Home() {
       }
 
       console.log(`Processing ${segments.length} segment(s)`);
+
+      // Save audio to Supabase Storage if not already saved
+      if (!meetingId) {
+        setProcessingStep('音声ファイルを保存中...');
+        const audioBlob = new Blob(segments, { type: 'audio/webm' });
+        audioSize = audioBlob.size;
+        const audioFileName = `${user!.id}/${Date.now()}.webm`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('meeting-audio')
+          .upload(audioFileName, audioBlob);
+
+        if (uploadError) {
+          console.error('Failed to upload audio:', uploadError);
+        } else {
+          audioUrl = audioFileName;
+          console.log('Audio saved successfully:', audioUrl, 'Size:', (audioSize / (1024 * 1024)).toFixed(2), 'MB');
+        }
+
+        // Create temporary meeting record with audio
+        const { data: tempMeeting, error: tempError } = await supabase
+          .from('meetings')
+          .insert({
+            user_id: user!.id,
+            title: `処理中 - ${new Date().toLocaleDateString('ja-JP')}`,
+            transcript: '',
+            formatted_minutes: '',
+            audio_url: audioUrl,
+            audio_size: audioSize,
+            transcription_status: 'processing',
+            project_id: selectedProjectId || undefined,
+          })
+          .select()
+          .single();
+
+        if (tempError) throw tempError;
+        tempMeetingId = tempMeeting.id;
+        setSelectedMeetingId(tempMeetingId);
+        await loadMeetings();
+      }
 
       let combinedTranscript = '';
 
@@ -558,37 +602,79 @@ ${transcript}`
         text: info,
       }));
 
-      const meetingInsertData: any = {
-        user_id: user!.id,
-        title,
-        transcript,
-        formatted_minutes: formattedMinutes,
-        todos: initialTodos,
-        decisions: initialDecisions,
-        shared_information: initialSharedInfo,
-      };
+      // Update the temporary meeting with transcription results
+      if (tempMeetingId) {
+        const { error: updateError } = await supabase
+          .from('meetings')
+          .update({
+            title,
+            transcript,
+            formatted_minutes: formattedMinutes,
+            todos: initialTodos,
+            decisions: initialDecisions,
+            shared_information: initialSharedInfo,
+            transcription_status: 'completed',
+            transcription_error: null,
+          })
+          .eq('id', tempMeetingId);
 
-      if (selectedProjectId) {
-        meetingInsertData.project_id = selectedProjectId;
+        if (updateError) throw updateError;
+
+        setSelectedMeetingId(tempMeetingId);
+        await loadMeetings();
       }
-
-      const { data: meeting, error } = await supabase
-        .from('meetings')
-        .insert(meetingInsertData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setSelectedMeetingId(meeting.id);
-      await loadMeetings();
     } catch (error) {
       console.error('Error processing recording:', error);
       const errorMessage = error instanceof Error ? error.message : '録音の処理に失敗しました。APIキーを確認してください。';
+
+      // Update meeting record with error status if we have a temp meeting
+      if (tempMeetingId) {
+        await supabase
+          .from('meetings')
+          .update({
+            transcription_status: 'failed',
+            transcription_error: errorMessage,
+          })
+          .eq('id', tempMeetingId);
+        await loadMeetings();
+      }
+
       alert(`エラー: ${errorMessage}`);
     } finally {
       setProcessing(false);
       setProcessingStep('');
+    }
+  };
+
+  const retryTranscription = async (meetingId: string) => {
+    try {
+      const { data: meeting, error: fetchError } = await supabase
+        .from('meetings')
+        .select('audio_url')
+        .eq('id', meetingId)
+        .single();
+
+      if (fetchError || !meeting?.audio_url) {
+        throw new Error('音声データが見つかりません。');
+      }
+
+      setProcessing(true);
+      setProcessingStep('音声ファイルをダウンロード中...');
+
+      const { data: audioData, error: downloadError } = await supabase.storage
+        .from('meeting-audio')
+        .download(meeting.audio_url);
+
+      if (downloadError || !audioData) {
+        throw new Error('音声ファイルのダウンロードに失敗しました。');
+      }
+
+      const segments = [audioData];
+      await processRecording(segments, meetingId);
+    } catch (error) {
+      console.error('Error retrying transcription:', error);
+      const errorMessage = error instanceof Error ? error.message : '再試行に失敗しました。';
+      alert(`エラー: ${errorMessage}`);
     }
   };
 
@@ -606,6 +692,7 @@ ${transcript}`
           setSelectedMeetingId(null);
           loadMeetings();
         }}
+        onRetryTranscription={retryTranscription}
       />
     );
   }

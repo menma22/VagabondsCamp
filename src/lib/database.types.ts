@@ -31,6 +31,10 @@ export interface Database {
           title: string;
           transcript: string;
           formatted_minutes: string;
+          audio_url: string | null;
+          audio_size: number | null;
+          transcription_status: string;
+          transcription_error: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -40,6 +44,10 @@ export interface Database {
           title?: string;
           transcript?: string;
           formatted_minutes?: string;
+          audio_url?: string | null;
+          audio_size?: number | null;
+          transcription_status?: string;
+          transcription_error?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -49,6 +57,10 @@ export interface Database {
           title?: string;
           transcript?: string;
           formatted_minutes?: string;
+          audio_url?: string | null;
+          audio_size?: number | null;
+          transcription_status?: string;
+          transcription_error?: string | null;
           created_at?: string;
           updated_at?: string;
         };
