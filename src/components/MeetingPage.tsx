@@ -64,11 +64,7 @@ interface MeetingData {
   shared_information: SharedInfoItem[];
   audio_url: string | null;
   audio_size: number | null;
-<<<<<<< Updated upstream
-  transcription_status: string;
-=======
   transcription_status: 'pending' | 'processing' | 'completed' | 'failed';
->>>>>>> Stashed changes
   transcription_error: string | null;
 }
 
@@ -88,11 +84,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
     shared_information: [],
     audio_url: null,
     audio_size: null,
-<<<<<<< Updated upstream
-    transcription_status: 'pending',
-=======
     transcription_status: 'completed',
->>>>>>> Stashed changes
     transcription_error: null,
   });
   const [processing, setProcessing] = useState(false);
@@ -163,11 +155,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
         shared_information: data.shared_information || [],
         audio_url: data.audio_url || null,
         audio_size: data.audio_size || null,
-<<<<<<< Updated upstream
-        transcription_status: data.transcription_status || 'pending',
-=======
         transcription_status: data.transcription_status || 'completed',
->>>>>>> Stashed changes
         transcription_error: data.transcription_error || null,
       });
     } catch (error) {
@@ -610,26 +598,23 @@ ${transcript}`,
           <div className="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${
-                  meeting.transcription_status === 'completed' ? 'bg-green-100' :
+                <div className={`p-2 rounded-lg ${meeting.transcription_status === 'completed' ? 'bg-green-100' :
                   meeting.transcription_status === 'failed' ? 'bg-red-100' :
-                  'bg-blue-100'
-                }`}>
-                  <Mic className={`w-5 h-5 ${
-                    meeting.transcription_status === 'completed' ? 'text-green-600' :
+                    'bg-blue-100'
+                  }`}>
+                  <Mic className={`w-5 h-5 ${meeting.transcription_status === 'completed' ? 'text-green-600' :
                     meeting.transcription_status === 'failed' ? 'text-red-600' :
-                    'text-blue-600'
-                  }`} />
+                      'text-blue-600'
+                    }`} />
                 </div>
                 <div>
                   <div className="font-medium text-slate-900">
                     音声データ: {meeting.audio_size ? `${(meeting.audio_size / (1024 * 1024)).toFixed(2)} MB` : '不明'}
                   </div>
-                  <div className={`text-sm ${
-                    meeting.transcription_status === 'completed' ? 'text-green-600' :
+                  <div className={`text-sm ${meeting.transcription_status === 'completed' ? 'text-green-600' :
                     meeting.transcription_status === 'failed' ? 'text-red-600' :
-                    'text-blue-600'
-                  }`}>
+                      'text-blue-600'
+                    }`}>
                     {meeting.transcription_status === 'completed' && '文字起こし完了'}
                     {meeting.transcription_status === 'failed' && `文字起こし失敗: ${meeting.transcription_error || '不明なエラー'}`}
                     {meeting.transcription_status === 'processing' && '処理中...'}
