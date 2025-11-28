@@ -181,7 +181,8 @@ export function Home() {
   const handleStopRecording = async () => {
     try {
       const segments = await stopRecording();
-      await processRecording(segments);
+      // Pass the recording meeting ID so processRecording can update the correct record
+      await processRecording(segments, recordingMeetingId || undefined);
     } catch (error) {
       console.error('Error stopping recording:', error);
       alert('録音の停止に失敗しました');
@@ -273,7 +274,7 @@ export function Home() {
     } catch (error) {
       console.error(`Transcription error for segment ${segmentIndex + 1}:`, error);
       if (retryCount < maxRetries && error instanceof Error &&
-          (error.message.includes('overloaded') || error.message.includes('quota') || error.message.includes('rate limit') || error.message.includes('Resource has been exhausted'))) {
+        (error.message.includes('overloaded') || error.message.includes('quota') || error.message.includes('rate limit') || error.message.includes('Resource has been exhausted'))) {
         const delay = baseDelay * Math.pow(2, retryCount);
         console.log(`Network/Rate error, retrying in ${delay / 1000} seconds...`);
         setProcessingStep(`エラー発生、${delay / 1000}秒後に再試行... (${retryCount + 1}/${maxRetries})`);
@@ -307,25 +308,28 @@ export function Home() {
 
       console.log(`Processing ${segments.length} segment(s)`);
 
-      // Save audio to Supabase Storage if not already saved
+      // Always save audio to Supabase Storage
+      setProcessingStep('音声ファイルを保存中...');
+      const audioBlob = new Blob(segments, { type: 'audio/webm' });
+      audioSize = audioBlob.size;
+      const audioFileName = `${user!.id}/${Date.now()}.webm`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('meeting-audio')
+        .upload(audioFileName, audioBlob);
+
+      if (uploadError) {
+        console.error('Failed to upload audio:', uploadError);
+        console.error('Upload error details:', uploadError.message);
+        throw new Error(`音声のアップロードに失敗しました: ${uploadError.message}`);
+      } else {
+        audioUrl = audioFileName;
+        console.log('Audio saved successfully:', audioUrl, 'Size:', (audioSize / (1024 * 1024)).toFixed(2), 'MB');
+      }
+
+      // Create or update meeting record with audio
       if (!meetingId) {
-        setProcessingStep('音声ファイルを保存中...');
-        const audioBlob = new Blob(segments, { type: 'audio/webm' });
-        audioSize = audioBlob.size;
-        const audioFileName = `${user!.id}/${Date.now()}.webm`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('meeting-audio')
-          .upload(audioFileName, audioBlob);
-
-        if (uploadError) {
-          console.error('Failed to upload audio:', uploadError);
-        } else {
-          audioUrl = audioFileName;
-          console.log('Audio saved successfully:', audioUrl, 'Size:', (audioSize / (1024 * 1024)).toFixed(2), 'MB');
-        }
-
-        // Create temporary meeting record with audio
+        // Create new meeting record
         const { data: tempMeeting, error: tempError } = await supabase
           .from('meetings')
           .insert({
@@ -344,6 +348,24 @@ export function Home() {
         if (tempError) throw tempError;
         tempMeetingId = tempMeeting.id;
         setSelectedMeetingId(tempMeetingId);
+        await loadMeetings();
+      } else {
+        // Update existing meeting record with audio info
+        tempMeetingId = meetingId;
+        const { error: updateError } = await supabase
+          .from('meetings')
+          .update({
+            audio_url: audioUrl,
+            audio_size: audioSize,
+            transcription_status: 'processing',
+          })
+          .eq('id', meetingId);
+
+        if (updateError) {
+          console.error('Failed to update meeting with audio info:', updateError);
+          throw new Error(`会議レコードの更新に失敗しました: ${updateError.message}`);
+        }
+        console.log('Meeting record updated with audio info:', meetingId);
         await loadMeetings();
       }
 
@@ -479,10 +501,10 @@ export function Home() {
 文字起こしデータ：
 
 ${transcript}`
-              }]
-            }]
-          })
-        }
+                  }]
+                }]
+              })
+            }
           );
 
           if (formattingResponse.ok) {
@@ -506,7 +528,7 @@ ${transcript}`
           throw new Error(`議事録の生成に失敗しました: ${errorMsg}`);
         } catch (error) {
           if (formattingRetries < maxFormattingRetries - 1 && error instanceof Error &&
-              (error.message.includes('overloaded') || error.message.includes('quota') || error.message.includes('rate limit'))) {
+            (error.message.includes('overloaded') || error.message.includes('quota') || error.message.includes('rate limit'))) {
             formattingRetries++;
             const delay = 10000 * Math.pow(2, formattingRetries - 1);
             console.log(`Formatting error, retrying in ${delay / 1000} seconds...`);
@@ -811,17 +833,15 @@ ${transcript}`
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mb-px">
           <button
             onClick={() => setSelectedProjectId(null)}
-            className={`tab-smooth group flex items-center gap-2 px-6 py-3 transition-all duration-300 whitespace-nowrap relative ${
-              selectedProjectId === null
-                ? 'bg-white text-slate-900 font-bold shadow-md border-2 border-slate-200 border-b-0 translate-y-0.5 z-10'
-                : 'bg-white/40 text-slate-600 hover:bg-white/60 border-2 border-white/30 border-b-white/30'
-            }`}
+            className={`tab-smooth group flex items-center gap-2 px-6 py-3 transition-all duration-300 whitespace-nowrap relative ${selectedProjectId === null
+              ? 'bg-white text-slate-900 font-bold shadow-md border-2 border-slate-200 border-b-0 translate-y-0.5 z-10'
+              : 'bg-white/40 text-slate-600 hover:bg-white/60 border-2 border-white/30 border-b-white/30'
+              }`}
           >
-            <Folder className={`w-5 h-5 transition-all duration-300 ${
-              selectedProjectId === null
-                ? 'text-slate-700'
-                : ''
-            }`} />
+            <Folder className={`w-5 h-5 transition-all duration-300 ${selectedProjectId === null
+              ? 'text-slate-700'
+              : ''
+              }`} />
             <span>すべての会議</span>
           </button>
           {projects.map((project) => (
@@ -873,11 +893,10 @@ ${transcript}`
                 <>
                   <button
                     onClick={() => setSelectedProjectId(project.id)}
-                    className={`tab-smooth flex items-center gap-2 px-6 py-3 transition-all duration-300 whitespace-nowrap relative border-2 border-b-0 ${
-                      selectedProjectId === project.id
-                        ? 'tab-colored text-white font-bold shadow-md translate-y-0.5 z-10'
-                        : 'bg-white/40 text-slate-600 hover:bg-white/60 border-white/30 border-b-white/30'
-                    }`}
+                    className={`tab-smooth flex items-center gap-2 px-6 py-3 transition-all duration-300 whitespace-nowrap relative border-2 border-b-0 ${selectedProjectId === project.id
+                      ? 'tab-colored text-white font-bold shadow-md translate-y-0.5 z-10'
+                      : 'bg-white/40 text-slate-600 hover:bg-white/60 border-white/30 border-b-white/30'
+                      }`}
                     style={selectedProjectId === project.id ? {
                       backgroundColor: project.color,
                       borderColor: project.color,
@@ -919,78 +938,78 @@ ${transcript}`
         </div>
 
         <div className="bg-white rounded-3xl rounded-tl-none shadow-2xl border-2 border-slate-200 p-8">
-        <button
-          onClick={createNewMeeting}
-          className="w-full mb-10 group relative overflow-hidden bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-500 text-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-cyan-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <div className="relative flex items-center justify-center gap-4">
-            <Plus className="w-8 h-8" />
-            <span className="text-2xl font-bold">新しい会議を作成</span>
-          </div>
-        </button>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-12 h-12 animate-spin text-slate-900" />
-          </div>
-        ) : filteredMeetings.length === 0 ? (
-          <div className="text-center py-20">
-            <Calendar className="w-24 h-24 text-slate-300 mx-auto mb-6" />
-            <h3 className="text-2xl font-bold text-slate-900 mb-3">
-              {selectedProjectId ? 'このプロジェクトに会議がありません' : 'まだ会議がありません'}
-            </h3>
-            <p className="text-slate-500 text-lg">
-              上のボタンから{selectedProjectId ? 'このプロジェクトの' : '最初の'}会議を作成しましょう
-            </p>
-          </div>
-        ) : (
-          <div>
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-orange-600 bg-clip-text text-transparent mb-8">
-              {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name || 'プロジェクト' : 'すべての会議'}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMeetings.map((meeting) => (
-                <div
-                  key={meeting.id}
-                  className="relative group"
-                >
-                  <button
-                    onClick={() => setSelectedMeetingId(meeting.id)}
-                    className="w-full text-left bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-white/50 hover:border-cyan-200 hover:scale-[1.03] group-hover:bg-white"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-shrink-0">
-                        <div className="bg-gradient-to-br from-cyan-400 via-blue-400 to-orange-400 p-3 rounded-2xl shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all duration-300">
-                          <Calendar className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                      <p className="text-base text-slate-700 font-medium">
-                        {new Date(meeting.created_at).toLocaleDateString('ja-JP', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </p>
-                    </div>
-                    <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
-                      <h3 className="font-bold text-slate-900 text-lg group-hover:bg-gradient-to-r group-hover:from-cyan-600 group-hover:to-blue-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
-                        {meeting.title || '無題の会議'}
-                      </h3>
-                    </div>
-                  </button>
-                  <button
-                    onClick={(e) => deleteMeeting(meeting.id, e)}
-                    className="absolute top-4 right-4 p-3 bg-white/90 backdrop-blur-sm rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-red-50 hover:text-red-600 hover:scale-110 border border-white"
-                    aria-label="削除"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+          <button
+            onClick={createNewMeeting}
+            className="w-full mb-10 group relative overflow-hidden bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-500 text-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-cyan-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative flex items-center justify-center gap-4">
+              <Plus className="w-8 h-8" />
+              <span className="text-2xl font-bold">新しい会議を作成</span>
             </div>
-          </div>
-        )}
+          </button>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-12 h-12 animate-spin text-slate-900" />
+            </div>
+          ) : filteredMeetings.length === 0 ? (
+            <div className="text-center py-20">
+              <Calendar className="w-24 h-24 text-slate-300 mx-auto mb-6" />
+              <h3 className="text-2xl font-bold text-slate-900 mb-3">
+                {selectedProjectId ? 'このプロジェクトに会議がありません' : 'まだ会議がありません'}
+              </h3>
+              <p className="text-slate-500 text-lg">
+                上のボタンから{selectedProjectId ? 'このプロジェクトの' : '最初の'}会議を作成しましょう
+              </p>
+            </div>
+          ) : (
+            <div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-orange-600 bg-clip-text text-transparent mb-8">
+                {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name || 'プロジェクト' : 'すべての会議'}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredMeetings.map((meeting) => (
+                  <div
+                    key={meeting.id}
+                    className="relative group"
+                  >
+                    <button
+                      onClick={() => setSelectedMeetingId(meeting.id)}
+                      className="w-full text-left bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-white/50 hover:border-cyan-200 hover:scale-[1.03] group-hover:bg-white"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex-shrink-0">
+                          <div className="bg-gradient-to-br from-cyan-400 via-blue-400 to-orange-400 p-3 rounded-2xl shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all duration-300">
+                            <Calendar className="w-6 h-6 text-white" />
+                          </div>
+                        </div>
+                        <p className="text-base text-slate-700 font-medium">
+                          {new Date(meeting.created_at).toLocaleDateString('ja-JP', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
+                        <h3 className="font-bold text-slate-900 text-lg group-hover:bg-gradient-to-r group-hover:from-cyan-600 group-hover:to-blue-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
+                          {meeting.title || '無題の会議'}
+                        </h3>
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => deleteMeeting(meeting.id, e)}
+                      className="absolute top-4 right-4 p-3 bg-white/90 backdrop-blur-sm rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-red-50 hover:text-red-600 hover:scale-110 border border-white"
+                      aria-label="削除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1081,11 +1100,10 @@ ${transcript}`
       <button
         onClick={isRecording ? handleStopRecording : startQuickRecording}
         disabled={processing}
-        className={`fixed bottom-8 right-8 w-20 h-20 rounded-3xl shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-white/30 ${
-          isRecording
-            ? 'bg-gradient-to-br from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 animate-pulse shadow-red-500/50'
-            : 'bg-gradient-to-br from-orange-400 via-orange-500 to-pink-500 hover:shadow-3xl'
-        }`}
+        className={`fixed bottom-8 right-8 w-20 h-20 rounded-3xl shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-white/30 ${isRecording
+          ? 'bg-gradient-to-br from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 animate-pulse shadow-red-500/50'
+          : 'bg-gradient-to-br from-orange-400 via-orange-500 to-pink-500 hover:shadow-3xl'
+          }`}
       >
         {processing ? (
           <Loader2 className="w-10 h-10 animate-spin text-white" />
@@ -1109,13 +1127,13 @@ ${transcript}`
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-10 max-w-md w-full mx-4 shadow-2xl border-2 border-white/50">
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-orange-400 rounded-full blur-2xl opacity-30 animate-pulse"></div>
-              <Loader2 className="w-20 h-20 animate-spin mx-auto mb-6 relative" style={{stroke: 'url(#gradient)'}} />
+              <Loader2 className="w-20 h-20 animate-spin mx-auto mb-6 relative" style={{ stroke: 'url(#gradient)' }} />
               <svg width="0" height="0">
                 <defs>
                   <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{stopColor: '#22d3ee'}} />
-                    <stop offset="50%" style={{stopColor: '#3b82f6'}} />
-                    <stop offset="100%" style={{stopColor: '#fb923c'}} />
+                    <stop offset="0%" style={{ stopColor: '#22d3ee' }} />
+                    <stop offset="50%" style={{ stopColor: '#3b82f6' }} />
+                    <stop offset="100%" style={{ stopColor: '#fb923c' }} />
                   </linearGradient>
                 </defs>
               </svg>
