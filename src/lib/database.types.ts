@@ -33,11 +33,7 @@ export interface Database {
           formatted_minutes: string;
           audio_url: string | null;
           audio_size: number | null;
-<<<<<<< Updated upstream
-          transcription_status: string;
-=======
           transcription_status: 'pending' | 'processing' | 'completed' | 'failed';
->>>>>>> Stashed changes
           transcription_error: string | null;
           created_at: string;
           updated_at: string;
@@ -50,11 +46,7 @@ export interface Database {
           formatted_minutes?: string;
           audio_url?: string | null;
           audio_size?: number | null;
-<<<<<<< Updated upstream
-          transcription_status?: string;
-=======
           transcription_status?: 'pending' | 'processing' | 'completed' | 'failed';
->>>>>>> Stashed changes
           transcription_error?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -67,11 +59,7 @@ export interface Database {
           formatted_minutes?: string;
           audio_url?: string | null;
           audio_size?: number | null;
-<<<<<<< Updated upstream
-          transcription_status?: string;
-=======
           transcription_status?: 'pending' | 'processing' | 'completed' | 'failed';
->>>>>>> Stashed changes
           transcription_error?: string | null;
           created_at?: string;
           updated_at?: string;
