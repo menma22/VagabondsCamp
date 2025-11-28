@@ -35,8 +35,14 @@ export interface Database {
           audio_size: number | null;
           transcription_status: 'pending' | 'processing' | 'completed' | 'failed';
           transcription_error: string | null;
+          project_id: string | null;
           created_at: string;
           updated_at: string;
+          todos: any[];
+          decisions: any[];
+          shared_information: any[];
+          reference_urls: any[];
+          notes: string;
         };
         Insert: {
           id?: string;
@@ -48,8 +54,14 @@ export interface Database {
           audio_size?: number | null;
           transcription_status?: 'pending' | 'processing' | 'completed' | 'failed';
           transcription_error?: string | null;
+          project_id?: string | null;
           created_at?: string;
           updated_at?: string;
+          todos?: any[];
+          decisions?: any[];
+          shared_information?: any[];
+          reference_urls?: any[];
+          notes?: string;
         };
         Update: {
           id?: string;
@@ -61,8 +73,14 @@ export interface Database {
           audio_size?: number | null;
           transcription_status?: 'pending' | 'processing' | 'completed' | 'failed';
           transcription_error?: string | null;
+          project_id?: string | null;
           created_at?: string;
           updated_at?: string;
+          todos?: any[];
+          decisions?: any[];
+          shared_information?: any[];
+          reference_urls?: any[];
+          notes?: string;
         };
       };
     };
