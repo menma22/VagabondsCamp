@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecording } from '../contexts/RecordingContext';
 import { supabase } from '../lib/supabase';
+import { downloadAudioFromStorage } from '../lib/audioUpload';
+import { markMeetingAsProcessing } from '../lib/meetingHelpers';
+import { TranscriptionStatusCard } from './TranscriptionStatusCard';
 import { AIChat } from './AIChat';
 import { ActionItems } from './ActionItems';
 import { DecisionItems } from './DecisionItems';
@@ -18,6 +21,7 @@ import {
   X,
   Plus,
   Trash2,
+  Folder,
 } from 'lucide-react';
 
 interface MeetingPageProps {
@@ -60,7 +64,11 @@ interface MeetingData {
   shared_information: SharedInfoItem[];
   audio_url: string | null;
   audio_size: number | null;
+<<<<<<< Updated upstream
   transcription_status: string;
+=======
+  transcription_status: 'pending' | 'processing' | 'completed' | 'failed';
+>>>>>>> Stashed changes
   transcription_error: string | null;
 }
 
@@ -80,7 +88,11 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
     shared_information: [],
     audio_url: null,
     audio_size: null,
+<<<<<<< Updated upstream
     transcription_status: 'pending',
+=======
+    transcription_status: 'completed',
+>>>>>>> Stashed changes
     transcription_error: null,
   });
   const [processing, setProcessing] = useState(false);
@@ -137,6 +149,9 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
       if (error) throw error;
 
+      console.log('Loaded meeting data:', data);
+      console.log('Audio URL:', data.audio_url);
+
       setMeeting({
         title: data.title || '',
         transcript: data.transcript || '',
@@ -148,7 +163,11 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
         shared_information: data.shared_information || [],
         audio_url: data.audio_url || null,
         audio_size: data.audio_size || null,
+<<<<<<< Updated upstream
         transcription_status: data.transcription_status || 'pending',
+=======
+        transcription_status: data.transcription_status || 'completed',
+>>>>>>> Stashed changes
         transcription_error: data.transcription_error || null,
       });
     } catch (error) {
@@ -703,66 +722,140 @@ ${transcript}`,
           <DecisionItems items={meeting.decisions} onUpdate={updateDecisions} />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-slate-900 p-2 rounded-lg">
-              <Mic className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900">録音</h2>
-          </div>
 
-          <div className="flex flex-col items-center justify-center py-8 bg-slate-50 rounded-xl">
-            {isRecordingThisMeeting ? (
-              <>
-                <div className="relative mb-4">
-                  <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Left Column: Recording UI */}
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-slate-900 p-2 rounded-lg">
+                <Mic className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">録音</h2>
+            </div>
+
+            <div className="flex flex-col items-center justify-center py-8 bg-slate-50 rounded-xl h-[300px]">
+              {isRecordingThisMeeting ? (
+                <>
+                  <div className="relative mb-4">
+                    <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+                      <Mic className="w-10 h-10 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-mono font-bold text-slate-900 mb-4">
+                    {formatTime(recordingTime)}
+                  </div>
+                  <button
+                    onClick={handleStopRecording}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
+                  >
+                    <Square className="w-5 h-5" />
+                    録音を停止
+                  </button>
+                </>
+              ) : processing ? (
+                <>
+                  <Loader2 className="w-12 h-12 animate-spin text-slate-900 mb-4" />
+                  <p className="text-slate-700 font-medium">{processingStep || '処理中...'}</p>
+                </>
+              ) : isRecording ? (
+                <>
+                  <div className="w-20 h-20 bg-amber-500 rounded-full flex items-center justify-center mb-4">
                     <Mic className="w-10 h-10 text-white" />
                   </div>
+                  <p className="text-slate-700 font-medium mb-4">別の会議を録音中です</p>
+                  <button
+                    disabled
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-400 text-white rounded-lg font-medium cursor-not-allowed"
+                  >
+                    <Mic className="w-5 h-5" />
+                    録音中
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-4">
+                    <Mic className="w-10 h-10 text-white" />
+                  </div>
+                  <button
+                    onClick={handleStartRecording}
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition"
+                  >
+                    <Mic className="w-5 h-5" />
+                    録音を開始
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Audio File List */}
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-blue-500 p-2 rounded-lg">
+                <Folder className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">音声データ</h2>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 h-[300px] overflow-y-auto custom-scrollbar">
+              {/* Debug Info */}
+              <div className="mb-4 p-2 bg-gray-200 text-xs rounded font-mono text-slate-600">
+                Debug: Audio URL = {meeting.audio_url ? meeting.audio_url : 'NULL'}
+                <br />
+                Status = {meeting.transcription_status}
+              </div>
+
+              {meeting.audio_url ? (
+                <div className="space-y-4">
+                  <TranscriptionStatusCard
+                    status={meeting.transcription_status}
+                    audioUrl={meeting.audio_url}
+                    audioSize={meeting.audio_size}
+                    error={meeting.transcription_error}
+                    onRetry={async () => {
+                      if (!confirm('この会議の文字起こしを再試行しますか？')) {
+                        return;
+                      }
+
+                      try {
+                        // Mark meeting as processing
+                        await markMeetingAsProcessing(meetingId);
+
+                        // Reload meeting data to show processing status
+                        await loadMeeting();
+
+                        alert('再試行を開始しました。処理が完了するまでお待ちください。\n\n注意: 現在、再試行機能は手動で音声を再アップロードして処理する必要があります。完全な自動再試行機能は今後のアップデートで追加されます。');
+                      } catch (error) {
+                        console.error('Error retrying transcription:', error);
+                        alert('再試行の開始に失敗しました');
+                      }
+                    }}
+                    onDownload={async () => {
+                      try {
+                        const audioBlob = await downloadAudioFromStorage(meeting.audio_url!);
+                        const url = URL.createObjectURL(audioBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `meeting_audio_${meetingId}.webm`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      } catch (error) {
+                        console.error('Error downloading audio:', error);
+                        alert('音声のダウンロードに失敗しました');
+                      }
+                    }}
+                  />
                 </div>
-                <div className="text-3xl font-mono font-bold text-slate-900 mb-4">
-                  {formatTime(recordingTime)}
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                  <Mic className="w-12 h-12 mb-3 opacity-20" />
+                  <p>録音データはありません</p>
                 </div>
-                <button
-                  onClick={handleStopRecording}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
-                >
-                  <Square className="w-5 h-5" />
-                  録音を停止
-                </button>
-              </>
-            ) : processing ? (
-              <>
-                <Loader2 className="w-12 h-12 animate-spin text-slate-900 mb-4" />
-                <p className="text-slate-700 font-medium">{processingStep || '処理中...'}</p>
-              </>
-            ) : isRecording ? (
-              <>
-                <div className="w-20 h-20 bg-amber-500 rounded-full flex items-center justify-center mb-4">
-                  <Mic className="w-10 h-10 text-white" />
-                </div>
-                <p className="text-slate-700 font-medium mb-4">別の会議を録音中です</p>
-                <button
-                  disabled
-                  className="flex items-center gap-2 px-6 py-3 bg-slate-400 text-white rounded-lg font-medium cursor-not-allowed"
-                >
-                  <Mic className="w-5 h-5" />
-                  録音中
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-4">
-                  <Mic className="w-10 h-10 text-white" />
-                </div>
-                <button
-                  onClick={handleStartRecording}
-                  className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition"
-                >
-                  <Mic className="w-5 h-5" />
-                  録音を開始
-                </button>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
