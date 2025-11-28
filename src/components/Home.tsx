@@ -352,6 +352,10 @@ export function Home() {
       } else {
         // Update existing meeting record with audio info
         tempMeetingId = meetingId;
+        console.log('Updating existing meeting with audio info:', meetingId);
+        console.log('Audio URL:', audioUrl, 'Size:', audioSize);
+
+        // @ts-ignore
         const { error: updateError } = await supabase
           .from('meetings')
           .update({
