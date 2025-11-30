@@ -330,6 +330,7 @@ export function Home() {
       // Create or update meeting record with audio
       if (!meetingId) {
         // Create new meeting record
+        // @ts-ignore
         const { data: tempMeeting, error: tempError } = await supabase
           .from('meetings')
           .insert({
