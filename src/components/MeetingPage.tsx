@@ -637,6 +637,12 @@ ${transcript}`,
           )}
         </div>
 
+
+        {/* Debug: Check audio_url state */}
+        {console.log('DEBUG - meeting.audio_url:', meeting.audio_url)}
+        {console.log('DEBUG - meeting.audio_size:', meeting.audio_size)}
+        {console.log('DEBUG - meeting.transcription_status:', meeting.transcription_status)}
+
         {meeting.audio_url && (
           <div className="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
             <div className="flex items-center justify-between">
