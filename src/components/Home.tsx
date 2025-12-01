@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRecording } from '../contexts/RecordingContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { supabase } from '../lib/supabase';
-import { Settings as SettingsIcon, LogOut, Mic, Square, Plus, Calendar, Loader2, Trash2, Users, Folder, X, Edit2, Check, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, LogOut, Mic, Square, Plus, Calendar, Loader2, Trash2, Users, Folder, X, Check, Palette } from 'lucide-react';
 import { Settings } from './Settings';
 import { MeetingPage } from './MeetingPage';
 import { Calendar as CalendarView } from './Calendar';

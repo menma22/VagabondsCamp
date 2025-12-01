@@ -22,7 +22,7 @@ interface TimelineCalendarProps {
 }
 
 export function TimelineCalendar({
-  selectedDate,
+  selectedDate: _selectedDate,
   events,
   onEventUpdate,
   onEventClick,
@@ -208,9 +208,8 @@ export function TimelineCalendar({
               return (
                 <div
                   key={event.id}
-                  className={`absolute rounded-lg shadow-sm hover:shadow-lg transition-all cursor-move group border border-white/20 ${
-                    isDragging ? 'opacity-80 scale-[1.02] z-50 shadow-2xl' : 'z-10'
-                  }`}
+                  className={`absolute rounded-lg shadow-sm hover:shadow-lg transition-all cursor-move group border border-white/20 ${isDragging ? 'opacity-80 scale-[1.02] z-50 shadow-2xl' : 'z-10'
+                    }`}
                   style={{
                     top: `${top}px`,
                     height: `${Math.max(height, 30)}px`,

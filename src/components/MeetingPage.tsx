@@ -14,11 +14,9 @@ import {
   Mic,
   Square,
   Loader2,
-  ListTodo,
   Link as LinkIcon,
   FileText,
-  Check,
-  X,
+
   Plus,
   Trash2,
   Folder,
@@ -204,10 +202,6 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
     setMeeting({ ...meeting, title });
   };
 
-  const updateNotes = (notes: string) => {
-    setMeeting({ ...meeting, notes });
-  };
-
   const updateTodos = (todos: TodoItem[]) => {
     setMeeting({ ...meeting, todos });
   };
@@ -379,7 +373,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 マークダウン形式で以下の構造に従ってください、目次と概要は必須項目です。その他の項目は適切なものを自分で考えてください：
 
 ## 目次
-- [概要](#概要)　必須項目
+- [概要](#概要)必須項目
 -
 -
 

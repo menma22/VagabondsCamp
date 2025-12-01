@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+
 
 interface Meeting {
   id: string;
@@ -40,8 +40,8 @@ export function MonthView({
   meetings,
   events,
   onDateSelect,
-  onPreviousMonth,
-  onNextMonth,
+  onPreviousMonth: _onPreviousMonth,
+  onNextMonth: _onNextMonth,
   onSelectMeeting,
   onEventClick,
 }: MonthViewProps) {
@@ -137,14 +137,12 @@ export function MonthView({
       <button
         key={day}
         onClick={() => onDateSelect(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
-        className={`p-2 text-left border-r border-b border-slate-300 transition-all flex flex-col overflow-hidden hover:bg-blue-50/50 ${
-          selected ? 'bg-blue-100 ring-2 ring-inset ring-blue-500' : today ? 'bg-blue-50' : 'bg-white'
-        }`}
+        className={`p-2 text-left border-r border-b border-slate-300 transition-all flex flex-col overflow-hidden hover:bg-blue-50/50 ${selected ? 'bg-blue-100 ring-2 ring-inset ring-blue-500' : today ? 'bg-blue-50' : 'bg-white'
+          }`}
       >
         <div className="px-1 mb-1.5 flex-shrink-0">
-          <span className={`text-sm font-semibold ${
-            today ? 'bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center inline-flex' : 'text-slate-900'
-          }`}>
+          <span className={`text-sm font-semibold ${today ? 'bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center inline-flex' : 'text-slate-900'
+            }`}>
             {day}
           </span>
         </div>
@@ -232,9 +230,8 @@ export function MonthView({
         {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => (
           <div
             key={day}
-            className={`py-2.5 text-center text-xs font-semibold uppercase ${
-              index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-slate-700'
-            }`}
+            className={`py-2.5 text-center text-xs font-semibold uppercase ${index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-slate-700'
+              }`}
           >
             {day}
           </div>

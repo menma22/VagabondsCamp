@@ -1,4 +1,3 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TimelineCalendar } from './TimelineCalendar';
 
 interface Meeting {
@@ -38,24 +37,15 @@ interface DayViewProps {
 export function DayView({
   selectedDate,
   events,
-  meetings,
-  onPreviousDay,
-  onNextDay,
+  meetings: _meetings,
+  onPreviousDay: _onPreviousDay,
+  onNextDay: _onNextDay,
   onEventUpdate,
   onEventClick,
   onEventDelete,
-  onSelectMeeting,
+  onSelectMeeting: _onSelectMeeting,
 }: DayViewProps) {
-  const isToday = () => {
-    const today = new Date();
-    return (
-      today.getDate() === selectedDate.getDate() &&
-      today.getMonth() === selectedDate.getMonth() &&
-      today.getFullYear() === selectedDate.getFullYear()
-    );
-  };
 
-  const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][selectedDate.getDay()];
 
   return (
     <div className="flex-1 overflow-hidden">

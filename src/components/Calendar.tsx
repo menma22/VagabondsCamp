@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { EventForm } from './EventForm';
 import { MonthView } from './MonthView';
 import { DayView } from './DayView';
-import { X, Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Meeting {
   id: string;
@@ -12,6 +12,7 @@ interface Meeting {
   created_at: string;
   meeting_date: string;
   project_id?: string;
+  project_color?: string;
 }
 
 interface CalendarEvent {
@@ -258,99 +259,97 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col">
       <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white relative">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setCurrentDate(new Date());
+              setSelectedDate(new Date());
+            }}
+            className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition border border-slate-300"
+          >
+            今日
+          </button>
+          <button
+            onClick={viewMode === 'month' ? handlePreviousMonth : handlePreviousDay}
+            className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-700" />
+          </button>
+          <button
+            onClick={viewMode === 'month' ? handleNextMonth : handleNextDay}
+            className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"
+          >
+            <ChevronRight className="w-5 h-5 text-slate-700" />
+          </button>
+        </div>
+
+        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2">
+          {viewMode === 'month' ? (
+            <h2 className="text-xl font-semibold text-slate-900">
+              {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
+            </h2>
+          ) : (
+            <h2 className="text-xl font-semibold text-slate-900 flex items-baseline gap-1">
+              <span>{currentDate.getFullYear()}年{currentDate.getMonth() + 1}月</span>
+              <span className="text-3xl font-bold">{currentDate.getDate()}日</span>
+              <span>({['日', '月', '火', '水', '木', '金', '土'][currentDate.getDay()]})</span>
+            </h2>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex bg-slate-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'month'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
+            >
+              月
+            </button>
             <button
               onClick={() => {
-                setCurrentDate(new Date());
-                setSelectedDate(new Date());
+                setViewMode('day');
+                if (!selectedDate) {
+                  setSelectedDate(new Date());
+                  setCurrentDate(new Date());
+                }
               }}
-              className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition border border-slate-300"
-            >
-              今日
-            </button>
-            <button
-              onClick={viewMode === 'month' ? handlePreviousMonth : handlePreviousDay}
-              className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5 text-slate-700" />
-            </button>
-            <button
-              onClick={viewMode === 'month' ? handleNextMonth : handleNextDay}
-              className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"
-            >
-              <ChevronRight className="w-5 h-5 text-slate-700" />
-            </button>
-          </div>
-
-          <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2">
-            {viewMode === 'month' ? (
-              <h2 className="text-xl font-semibold text-slate-900">
-                {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
-              </h2>
-            ) : (
-              <h2 className="text-xl font-semibold text-slate-900 flex items-baseline gap-1">
-                <span>{currentDate.getFullYear()}年{currentDate.getMonth() + 1}月</span>
-                <span className="text-3xl font-bold">{currentDate.getDate()}日</span>
-                <span>({['日', '月', '火', '水', '木', '金', '土'][currentDate.getDay()]})</span>
-              </h2>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex bg-slate-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('month')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                  viewMode === 'month'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'day'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
                 }`}
-              >
-                月
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('day');
-                  if (!selectedDate) {
-                    setSelectedDate(new Date());
-                    setCurrentDate(new Date());
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                  viewMode === 'day'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                日
-              </button>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
             >
-              <X className="w-5 h-5 text-slate-700" />
+              日
             </button>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-700" />
+          </button>
         </div>
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden flex">
           {viewMode === 'month' ? (
-          <MonthView
-            currentDate={currentDate}
-            selectedDate={selectedDate}
-            meetings={meetings}
-            events={events}
-            onDateSelect={handleDateSelect}
-            onPreviousMonth={handlePreviousMonth}
-            onNextMonth={handleNextMonth}
-            onSelectMeeting={(id) => {
-              onSelectMeeting(id);
-              onClose();
-            }}
-            onEventClick={handleEventClick}
-          />
+            <MonthView
+              currentDate={currentDate}
+              selectedDate={selectedDate}
+              meetings={meetings}
+              events={events}
+              onDateSelect={handleDateSelect}
+              onPreviousMonth={handlePreviousMonth}
+              onNextMonth={handleNextMonth}
+              onSelectMeeting={(id) => {
+                onSelectMeeting(id);
+                onClose();
+              }}
+              onEventClick={handleEventClick}
+            />
           ) : (
             <DayView
               selectedDate={selectedDate || new Date()}
@@ -448,23 +447,23 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
       </div>
 
       <button
-          onClick={handleAddEvent}
-          className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all flex items-center justify-center group z-10"
-        >
-          <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-        </button>
+        onClick={handleAddEvent}
+        className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all flex items-center justify-center group z-10"
+      >
+        <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+      </button>
 
-        {showEventForm && (selectedDate || viewMode === 'month') && (
-          <EventForm
-            date={selectedDate || new Date()}
-            onClose={() => {
-              setShowEventForm(false);
-              setSelectedEvent(null);
-            }}
-            onSave={handleSaveEvent}
-            initialEvent={selectedEvent}
-          />
-        )}
-      </div>
-    );
+      {showEventForm && (selectedDate || viewMode === 'month') && (
+        <EventForm
+          date={selectedDate || new Date()}
+          onClose={() => {
+            setShowEventForm(false);
+            setSelectedEvent(null);
+          }}
+          onSave={handleSaveEvent}
+          initialEvent={selectedEvent}
+        />
+      )}
+    </div>
+  );
 }

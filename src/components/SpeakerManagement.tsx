@@ -169,7 +169,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
 
       // Upload audio to Supabase Storage
       const fileName = `${user?.id}/${speakerId}/${Date.now()}.wav`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('speaker-voices')
         .upload(fileName, audioBlob);
 
@@ -242,11 +242,10 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
 
         {message && (
           <div
-            className={`px-4 py-3 rounded-lg text-sm mb-4 ${
-              message.type === 'success'
+            className={`px-4 py-3 rounded-lg text-sm mb-4 ${message.type === 'success'
                 ? 'bg-green-50 text-green-700'
                 : 'bg-red-50 text-red-600'
-            }`}
+              }`}
           >
             {message.text}
           </div>
@@ -278,9 +277,8 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
                 <button
                   key={color}
                   onClick={() => setSelectedColor(color)}
-                  className={`w-6 h-6 rounded-full transition ${
-                    selectedColor === color ? 'ring-2 ring-slate-900 ring-offset-2' : ''
-                  }`}
+                  className={`w-6 h-6 rounded-full transition ${selectedColor === color ? 'ring-2 ring-slate-900 ring-offset-2' : ''
+                    }`}
                   style={{ backgroundColor: color }}
                 />
               ))}
