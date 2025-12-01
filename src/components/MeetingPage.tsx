@@ -545,6 +545,7 @@ ${transcript}`,
           title,
           transcript,
           formatted_minutes: formattedMinutes,
+          transcription_status: 'completed',
           updated_at: new Date().toISOString(),
         })
         .eq('id', meetingId);
@@ -575,6 +576,8 @@ ${transcript}`,
         decisions: [...meeting.decisions, ...newDecisions],
         todos: [...meeting.todos, ...newTodos],
         shared_information: [...meeting.shared_information, ...newSharedInfo],
+        transcription_status: 'completed',
+        // Preserve audio_url and audio_size from earlier upload
       });
 
       if (newDecisions.length > 0 || newTodos.length > 0 || newSharedInfo.length > 0) {
