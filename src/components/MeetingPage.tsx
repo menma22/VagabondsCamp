@@ -361,6 +361,15 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
       console.log('Meeting record updated with audio info');
 
+      // Update local state to reflect the changes
+      setMeeting({
+        ...meeting,
+        audio_url: audioFileName,
+        audio_size: audioSize,
+        transcription_status: 'processing',
+      });
+
+
 
       let combinedTranscript = '';
 
