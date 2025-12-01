@@ -325,6 +325,43 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
       console.log(`Processing ${segments.length} segment(s)`);
 
+      // Save audio to Supabase Storage
+      setProcessingStep('音声ファイルを保存中...');
+      const audioBlob = new Blob(segments, { type: 'audio/webm' });
+      const audioSize = audioBlob.size;
+      const audioFileName = `${user!.id}/${Date.now()}.webm`;
+
+      console.log('Uploading audio to Storage:', audioFileName, 'Size:', (audioSize / (1024 * 1024)).toFixed(2), 'MB');
+
+      const { error: uploadError } = await supabase.storage
+        .from('meeting-audio')
+        .upload(audioFileName, audioBlob);
+
+      if (uploadError) {
+        console.error('Failed to upload audio:', uploadError);
+        throw new Error(`音声のアップロードに失敗しました: ${uploadError.message}`);
+      }
+
+      console.log('Audio saved successfully:', audioFileName);
+
+      // Update meeting record with audio info
+      const { error: updateError } = await supabase
+        .from('meetings')
+        .update({
+          audio_url: audioFileName,
+          audio_size: audioSize,
+          transcription_status: 'processing',
+        })
+        .eq('id', meetingId);
+
+      if (updateError) {
+        console.error('Failed to update meeting with audio info:', updateError);
+        throw new Error(`会議レコードの更新に失敗しました: ${updateError.message}`);
+      }
+
+      console.log('Meeting record updated with audio info');
+
+
       let combinedTranscript = '';
 
       for (let i = 0; i < segments.length; i++) {
