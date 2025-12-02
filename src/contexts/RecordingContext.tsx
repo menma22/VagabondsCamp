@@ -120,7 +120,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
 
       segmentTimerRef.current = setInterval(() => {
         startNewSegment();
-      }, 15 * 60 * 1000);
+      }, 5 * 60 * 1000);
 
       silenceTimerRef.current = setInterval(() => {
         checkAudioLevel();

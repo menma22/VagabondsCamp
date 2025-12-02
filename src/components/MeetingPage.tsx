@@ -590,6 +590,28 @@ ${transcript}`,
     } catch (error) {
       console.error('Error processing recording:', error);
       const errorMessage = error instanceof Error ? error.message : '録音の処理に失敗しました。APIキーを確認してください。';
+
+      // Update local state to failed
+      setMeeting(prev => ({
+        ...prev,
+        transcription_status: 'failed',
+        transcription_error: errorMessage
+      }));
+
+      // Update database to failed
+      try {
+        await supabase
+          .from('meetings')
+          .update({
+            transcription_status: 'failed',
+            transcription_error: errorMessage,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', meetingId);
+      } catch (dbError) {
+        console.error('Failed to update meeting status to failed:', dbError);
+      }
+
       alert(`エラー: ${errorMessage}`);
     } finally {
       setProcessing(false);
@@ -638,10 +660,7 @@ ${transcript}`,
         </div>
 
 
-        {/* Debug: Check audio_url state */}
-        {console.log('DEBUG - meeting.audio_url:', meeting.audio_url)}
-        {console.log('DEBUG - meeting.audio_size:', meeting.audio_size)}
-        {console.log('DEBUG - meeting.transcription_status:', meeting.transcription_status)}
+
 
         {meeting.audio_url && (
           <div className="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
@@ -702,7 +721,10 @@ ${transcript}`,
                 </button>
                 {meeting.transcription_status === 'failed' && onRetryTranscription && (
                   <button
-                    onClick={() => onRetryTranscription(meetingId)}
+                    onClick={async () => {
+                      await onRetryTranscription(meetingId);
+                      await loadMeeting();
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                   >
                     <Loader2 className="w-4 h-4" />
