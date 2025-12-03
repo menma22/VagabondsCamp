@@ -261,20 +261,37 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
     const segmentSizeMB = segmentBlob.size / (1024 * 1024);
     console.log(`Transcribing segment ${segmentIndex + 1}, size: ${segmentSizeMB.toFixed(2)} MB`);
 
-    // Gemini APIの制限チェック（20MB程度が安全）
-    if (segmentSizeMB > 20) {
-      throw new Error(`セグメント${segmentIndex + 1}のサイズが大きすぎます（${segmentSizeMB.toFixed(2)} MB）。録音を短い時間で区切ってください。`);
+    // File APIは2GBまで対応（inline_dataの20MB制限を大幅に緩和）
+    if (segmentSizeMB > 100) {
+      throw new Error(`セグメント${segmentIndex + 1}のサイズが大きすぎます（${segmentSizeMB.toFixed(2)} MB）。`);
     }
 
-    const reader = new FileReader();
-    const base64Audio = await new Promise<string>((resolve) => {
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        resolve(base64.split(',')[1]);
-      };
-      reader.readAsDataURL(segmentBlob);
-    });
+    // ステップ1: File APIにアップロード
+    console.log(`Uploading segment ${segmentIndex + 1} to File API...`);
+    const uploadResponse = await fetch(
+      `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'audio/webm',
+          'X-Goog-Upload-Protocol': 'raw'
+        },
+        body: segmentBlob
+      }
+    );
 
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json().catch(() => null);
+      console.error('File upload error:', errorData);
+      const errorMsg = errorData?.error?.message || uploadResponse.statusText;
+      throw new Error(`セグメント${segmentIndex + 1}のファイルアップロードに失敗しました: ${errorMsg}`);
+    }
+
+    const fileData = await uploadResponse.json();
+    const fileUri = fileData.file.uri;
+    console.log(`File uploaded successfully: ${fileUri}`);
+
+    // ステップ2: アップロードしたファイルを使って文字起こし
     const transcriptionResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
@@ -284,9 +301,9 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
           contents: [{
             parts: [
               {
-                inline_data: {
+                file_data: {
                   mime_type: 'audio/webm',
-                  data: base64Audio
+                  file_uri: fileUri
                 }
               },
               {
