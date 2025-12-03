@@ -310,22 +310,28 @@ export function Home() {
 
       // Always save audio to Supabase Storage
       setProcessingStep('音声ファイルを保存中...');
-      const audioBlob = new Blob(segments, { type: 'audio/webm' });
-      audioSize = audioBlob.size;
-      const audioFileName = `${user!.id}/${Date.now()}.webm`;
+      const audioUrls: string[] = [];
+      const timestamp = Date.now();
+      audioSize = 0;
 
-      const { error: uploadError } = await supabase.storage
-        .from('meeting-audio')
-        .upload(audioFileName, audioBlob);
+      for (let i = 0; i < segments.length; i++) {
+        const segmentBlob = segments[i];
+        const audioFileName = `${user!.id}/${timestamp}_part${i + 1}.webm`;
+        audioSize += segmentBlob.size;
 
-      if (uploadError) {
-        console.error('Failed to upload audio:', uploadError);
-        console.error('Upload error details:', uploadError.message);
-        throw new Error(`音声のアップロードに失敗しました: ${uploadError.message}`);
-      } else {
-        audioUrl = audioFileName;
-        console.log('Audio saved successfully:', audioUrl, 'Size:', (audioSize / (1024 * 1024)).toFixed(2), 'MB');
+        const { error: uploadError } = await supabase.storage
+          .from('meeting-audio')
+          .upload(audioFileName, segmentBlob);
+
+        if (uploadError) {
+          console.error(`Failed to upload segment ${i + 1}:`, uploadError);
+          throw new Error(`音声セグメント${i + 1}のアップロードに失敗しました: ${uploadError.message}`);
+        }
+        audioUrls.push(audioFileName);
       }
+
+      console.log('All segments saved successfully:', audioUrls);
+      audioUrl = audioUrls.length === 1 ? audioUrls[0] : JSON.stringify(audioUrls);
 
       // Create or update meeting record with audio
       if (!meetingId) {
@@ -688,15 +694,29 @@ ${transcript}`
       setProcessing(true);
       setProcessingStep('音声ファイルをダウンロード中...');
 
-      const { data: audioData, error: downloadError } = await supabase.storage
-        .from('meeting-audio')
-        .download(meeting.audio_url);
-
-      if (downloadError || !audioData) {
-        throw new Error('音声ファイルのダウンロードに失敗しました。');
+      let urls: string[] = [];
+      try {
+        if (meeting.audio_url.startsWith('[')) {
+          urls = JSON.parse(meeting.audio_url);
+        } else {
+          urls = [meeting.audio_url];
+        }
+      } catch (e) {
+        urls = [meeting.audio_url];
       }
 
-      const segments = [audioData];
+      const segments: Blob[] = [];
+      for (const url of urls) {
+        const { data: audioData, error: downloadError } = await supabase.storage
+          .from('meeting-audio')
+          .download(url);
+
+        if (downloadError || !audioData) {
+          throw new Error(`音声ファイルのダウンロードに失敗しました: ${url}`);
+        }
+        segments.push(audioData);
+      }
+
       await processRecording(segments, meetingId);
     } catch (error) {
       console.error('Error retrying transcription:', error);

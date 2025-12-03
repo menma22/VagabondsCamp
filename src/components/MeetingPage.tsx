@@ -325,32 +325,43 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
       console.log(`Processing ${segments.length} segment(s)`);
 
-      // Save audio to Supabase Storage
+      // Save audio segments to Supabase Storage
       setProcessingStep('音声ファイルを保存中...');
-      const audioBlob = new Blob(segments, { type: 'audio/webm' });
-      const audioSize = audioBlob.size;
-      const audioFileName = `${user!.id}/${Date.now()}.webm`;
+      const audioUrls: string[] = [];
+      let totalSize = 0;
+      const timestamp = Date.now();
 
-      console.log('Uploading audio to Storage:', audioFileName, 'Size:', (audioSize / (1024 * 1024)).toFixed(2), 'MB');
+      for (let i = 0; i < segments.length; i++) {
+        const segmentBlob = segments[i];
+        const audioFileName = `${user!.id}/${timestamp}_part${i + 1}.webm`;
+        totalSize += segmentBlob.size;
 
-      const { error: uploadError } = await supabase.storage
-        .from('meeting-audio')
-        .upload(audioFileName, audioBlob);
+        console.log(`Uploading segment ${i + 1}/${segments.length}:`, audioFileName, 'Size:', (segmentBlob.size / (1024 * 1024)).toFixed(2), 'MB');
 
-      if (uploadError) {
-        console.error('Failed to upload audio:', uploadError);
-        throw new Error(`音声のアップロードに失敗しました: ${uploadError.message}`);
+        const { error: uploadError } = await supabase.storage
+          .from('meeting-audio')
+          .upload(audioFileName, segmentBlob);
+
+        if (uploadError) {
+          console.error(`Failed to upload segment ${i + 1}:`, uploadError);
+          throw new Error(`音声セグメント${i + 1}のアップロードに失敗しました: ${uploadError.message}`);
+        }
+
+        audioUrls.push(audioFileName);
       }
 
-      console.log('Audio saved successfully:', audioFileName);
+      console.log('All segments saved successfully:', audioUrls);
 
       // Update meeting record with audio info
+      const audioUrlValue = audioUrls.length === 1 ? audioUrls[0] : JSON.stringify(audioUrls);
+
       const { error: updateError } = await supabase
         .from('meetings')
         .update({
-          audio_url: audioFileName,
-          audio_size: audioSize,
+          audio_url: audioUrlValue,
+          audio_size: totalSize,
           transcription_status: 'processing',
+          updated_at: new Date().toISOString(),
         })
         .eq('id', meetingId);
 
@@ -361,35 +372,21 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
       console.log('Meeting record updated with audio info');
 
-      // Update local state to reflect the changes
       setMeeting({
         ...meeting,
-        audio_url: audioFileName,
-        audio_size: audioSize,
+        audio_url: audioUrlValue,
+        audio_size: totalSize,
         transcription_status: 'processing',
       });
 
-
-
+      // Transcribe
+      setProcessingStep('文字起こし中...');
       let combinedTranscript = '';
 
-      for (let i = 0; i < segments.length; i++) {
-        const segment = segments[i];
-        const segmentSizeMB = segment.size / (1024 * 1024);
-
-        if (segment.size === 0) {
-          console.warn(`Segment ${i + 1} is empty, skipping...`);
-          continue;
-        }
-
-        setProcessingStep(`セグメント ${i + 1}/${segments.length} を文字起こし中...`);
-        console.log(`Processing segment ${i + 1}, size: ${segmentSizeMB.toFixed(2)} MB`);
-
-        const segmentTranscript = await transcribeSegment(segment, i);
-
-        if (segmentTranscript) {
-          combinedTranscript += (i > 0 ? '\n\n' : '') + segmentTranscript;
-        }
+      for (let i = 0; i < audioUrls.length; i++) {
+        setProcessingStep(`文字起こし中 (パート ${i + 1}/${audioUrls.length})...`);
+        const text = await transcribeAudio(audioUrls[i], i);
+        combinedTranscript += text + '\n\n';
       }
 
       const transcript = combinedTranscript.trim();
@@ -664,75 +661,94 @@ ${transcript}`,
 
         {meeting.audio_url && (
           <div className="mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${meeting.transcription_status === 'completed' ? 'bg-green-100' :
-                  meeting.transcription_status === 'failed' ? 'bg-red-100' :
-                    'bg-blue-100'
-                  }`}>
-                  <Mic className={`w-5 h-5 ${meeting.transcription_status === 'completed' ? 'text-green-600' :
-                    meeting.transcription_status === 'failed' ? 'text-red-600' :
-                      'text-blue-600'
-                    }`} />
-                </div>
-                <div>
-                  <div className="font-medium text-slate-900">
-                    音声データ: {meeting.audio_size ? `${(meeting.audio_size / (1024 * 1024)).toFixed(2)} MB` : '不明'}
-                  </div>
-                  <div className={`text-sm ${meeting.transcription_status === 'completed' ? 'text-green-600' :
-                    meeting.transcription_status === 'failed' ? 'text-red-600' :
-                      'text-blue-600'
-                    }`}>
-                    {meeting.transcription_status === 'completed' && '文字起こし完了'}
-                    {meeting.transcription_status === 'failed' && `文字起こし失敗: ${meeting.transcription_error || '不明なエラー'}`}
-                    {meeting.transcription_status === 'processing' && '処理中...'}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      const { data } = supabase.storage
-                        .from('meeting-audio')
-                        .getPublicUrl(meeting.audio_url!);
+            {(() => {
+              let urls: string[] = [];
+              try {
+                if (meeting.audio_url?.startsWith('[')) {
+                  urls = JSON.parse(meeting.audio_url);
+                } else {
+                  urls = [meeting.audio_url!];
+                }
+              } catch (e) {
+                urls = [meeting.audio_url!];
+              }
 
-                      const response = await fetch(data.publicUrl);
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `meeting-audio-${meetingId}.webm`;
-                      document.body.appendChild(a);
-                      a.click();
-                      window.URL.revokeObjectURL(url);
-                      document.body.removeChild(a);
-                    } catch (error) {
-                      console.error('Download failed:', error);
-                      alert('音声ファイルのダウンロードに失敗しました');
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  ダウンロード
-                </button>
-                {meeting.transcription_status === 'failed' && onRetryTranscription && (
-                  <button
-                    onClick={async () => {
-                      await onRetryTranscription(meetingId);
-                      await loadMeeting();
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                  >
-                    <Loader2 className="w-4 h-4" />
-                    再試行
-                  </button>
-                )}
-              </div>
-            </div>
+              return (
+                <div className="space-y-4">
+                  {urls.map((url, idx) => (
+                    <div key={idx} className="flex items-center justify-between border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${meeting.transcription_status === 'completed' ? 'bg-green-100' :
+                          meeting.transcription_status === 'failed' ? 'bg-red-100' :
+                            'bg-blue-100'
+                          }`}>
+                          <Mic className={`w-5 h-5 ${meeting.transcription_status === 'completed' ? 'text-green-600' :
+                            meeting.transcription_status === 'failed' ? 'text-red-600' :
+                              'text-blue-600'
+                            }`} />
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            音声データ {urls.length > 1 ? `(パート ${idx + 1})` : ''}: {idx === 0 && meeting.audio_size ? `${(meeting.audio_size / (1024 * 1024)).toFixed(2)} MB (合計)` : ''}
+                          </div>
+                          <div className={`text-sm ${meeting.transcription_status === 'completed' ? 'text-green-600' :
+                            meeting.transcription_status === 'failed' ? 'text-red-600' :
+                              'text-blue-600'
+                            }`}>
+                            {meeting.transcription_status === 'completed' && '文字起こし完了'}
+                            {meeting.transcription_status === 'failed' && `文字起こし失敗: ${meeting.transcription_error || '不明なエラー'}`}
+                            {meeting.transcription_status === 'processing' && '処理中...'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { data } = supabase.storage
+                                .from('meeting-audio')
+                                .getPublicUrl(url);
+
+                              const response = await fetch(data.publicUrl);
+                              const blob = await response.blob();
+                              const downloadUrl = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = downloadUrl;
+                              a.download = `meeting-audio-${meetingId}-part${idx + 1}.webm`;
+                              document.body.appendChild(a);
+                              a.click();
+                              window.URL.revokeObjectURL(downloadUrl);
+                              document.body.removeChild(a);
+                            } catch (error) {
+                              console.error('Download failed:', error);
+                              alert('音声ファイルのダウンロードに失敗しました');
+                            }
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          ダウンロード
+                        </button>
+                        {idx === 0 && meeting.transcription_status === 'failed' && onRetryTranscription && (
+                          <button
+                            onClick={async () => {
+                              await onRetryTranscription(meetingId);
+                              await loadMeeting();
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                          >
+                            <Loader2 className="w-4 h-4" />
+                            再試行
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 
