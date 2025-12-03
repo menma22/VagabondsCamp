@@ -328,6 +328,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       // Save audio segments to Supabase Storage
       setProcessingStep('音声ファイルを保存中...');
       const audioUrls: string[] = [];
+      const segmentBlobs: Blob[] = [];
       let totalSize = 0;
       const timestamp = Date.now();
 
@@ -348,6 +349,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
         }
 
         audioUrls.push(audioFileName);
+        segmentBlobs.push(segmentBlob);
       }
 
       console.log('All segments saved successfully:', audioUrls);
@@ -383,9 +385,9 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       setProcessingStep('文字起こし中...');
       let combinedTranscript = '';
 
-      for (let i = 0; i < audioUrls.length; i++) {
-        setProcessingStep(`文字起こし中 (パート ${i + 1}/${audioUrls.length})...`);
-        const text = await transcribeAudio(audioUrls[i], i);
+      for (let i = 0; i < segmentBlobs.length; i++) {
+        setProcessingStep(`文字起こし中 (パート ${i + 1}/${segmentBlobs.length})...`);
+        const text = await transcribeSegment(segmentBlobs[i], i);
         combinedTranscript += text + '\n\n';
       }
 
