@@ -20,8 +20,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const handleSetLanguage = (lang: Language) => {
-        setLanguage(lang);
         localStorage.setItem('app_language', lang);
+        window.location.reload();
     };
 
     const t = (path: string, params?: Record<string, string | number>): any => {
