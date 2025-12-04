@@ -44,6 +44,7 @@ export const translations = {
             recording: '録音中',
             stopRecording: '録音停止',
             startRecording: '録音開始',
+            untitled: '無題の会議',
         },
         home: {
             newMeeting: '新しい会議',
@@ -61,6 +62,8 @@ export const translations = {
             downloadingAudio: '音声ファイルをダウンロード中...',
             downloadAudioError: '音声ファイルのダウンロードに失敗しました',
             retryError: '再試行に失敗しました。',
+            createNewMeeting: '新しい会議を作成',
+            allMeetings: 'すべての会議',
         },
         errors: {
             apiKeyRequired: 'Gemini APIキーを設定してください',
@@ -272,6 +275,7 @@ export const translations = {
             recording: 'Recording',
             stopRecording: 'Stop Recording',
             startRecording: 'Start Recording',
+            untitled: 'Untitled Meeting',
         },
         home: {
             newMeeting: 'New Meeting',
@@ -289,6 +293,8 @@ export const translations = {
             downloadingAudio: 'Downloading audio files...',
             downloadAudioError: 'Failed to download audio files',
             retryError: 'Failed to retry.',
+            createNewMeeting: 'Create New Meeting',
+            allMeetings: 'All Meetings',
         },
         errors: {
             apiKeyRequired: 'Please set Gemini API Key',
