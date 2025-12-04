@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Trash2, Mic, Square, Loader2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Speaker {
   id: string;
@@ -27,6 +28,7 @@ const SPEAKER_COLORS = [
 
 export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSpeakerName, setNewSpeakerName] = useState('');
@@ -64,7 +66,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
       setSpeakers(data || []);
     } catch (error) {
       console.error('Error loading speakers:', error);
-      setMessage({ type: 'error', text: '話者の読み込みに失敗しました' });
+      setMessage({ type: 'error', text: t('speaker.loadError') });
     } finally {
       setLoading(false);
     }
@@ -89,16 +91,16 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
       setSpeakers([data, ...speakers]);
       setNewSpeakerName('');
       setSelectedColor(SPEAKER_COLORS[0]);
-      setMessage({ type: 'success', text: '話者を追加しました' });
+      setMessage({ type: 'success', text: t('speaker.added') });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       console.error('Error adding speaker:', error);
-      setMessage({ type: 'error', text: '話者の追加に失敗しました' });
+      setMessage({ type: 'error', text: t('speaker.addError') });
     }
   };
 
   const deleteSpeaker = async (speakerId: string) => {
-    if (!confirm('この話者を削除しますか？')) return;
+    if (!confirm(t('speaker.deleteConfirm'))) return;
 
     try {
       const { error } = await supabase
@@ -109,11 +111,11 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
       if (error) throw error;
 
       setSpeakers(speakers.filter(s => s.id !== speakerId));
-      setMessage({ type: 'success', text: '話者を削除しました' });
+      setMessage({ type: 'success', text: t('speaker.deleted') });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       console.error('Error deleting speaker:', error);
-      setMessage({ type: 'error', text: '話者の削除に失敗しました' });
+      setMessage({ type: 'error', text: t('speaker.deleteError') });
     }
   };
 
@@ -146,7 +148,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
       }, 1000);
     } catch (error) {
       console.error('Error starting recording:', error);
-      setMessage({ type: 'error', text: 'マイクへのアクセスに失敗しました' });
+      setMessage({ type: 'error', text: t('speaker.micError') });
     }
   };
 
@@ -165,7 +167,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
 
   const registerSpeakerVoice = async (speakerId: string, audioBlob: Blob) => {
     try {
-      setMessage({ type: 'success', text: '音声を登録中...' });
+      setMessage({ type: 'success', text: t('speaker.recording') });
 
       // Upload audio to Supabase Storage
       const fileName = `${user?.id}/${speakerId}/${Date.now()}.wav`;
@@ -199,20 +201,20 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
       );
 
       if (!response.ok) {
-        throw new Error('音声登録に失敗しました');
+        throw new Error(t('speaker.registerError'));
       }
 
       const result = await response.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: '音声を登録しました！' });
+        setMessage({ type: 'success', text: t('speaker.registered') });
         setTimeout(() => setMessage(null), 3000);
       } else {
-        throw new Error(result.error || '音声登録に失敗しました');
+        throw new Error(result.error || t('speaker.registerError'));
       }
     } catch (error) {
       console.error('Error registering voice:', error);
-      setMessage({ type: 'error', text: '音声登録に失敗しました' });
+      setMessage({ type: 'error', text: t('speaker.registerError') });
     }
   };
 
@@ -230,7 +232,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
             <div className="bg-slate-900 p-2 rounded-lg">
               <Users className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">話者管理</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{t('speaker.title')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -243,8 +245,8 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
         {message && (
           <div
             className={`px-4 py-3 rounded-lg text-sm mb-4 ${message.type === 'success'
-                ? 'bg-green-50 text-green-700'
-                : 'bg-red-50 text-red-600'
+              ? 'bg-green-50 text-green-700'
+              : 'bg-red-50 text-red-600'
               }`}
           >
             {message.text}
@@ -252,14 +254,14 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
         )}
 
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-slate-700 mb-3">新しい話者を追加</h3>
+          <h3 className="text-sm font-medium text-slate-700 mb-3">{t('speaker.addSpeaker')}</h3>
           <div className="flex gap-2 mb-3">
             <input
               type="text"
               value={newSpeakerName}
               onChange={(e) => setNewSpeakerName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addSpeaker()}
-              placeholder="話者名（例：山田太郎）"
+              placeholder={t('speaker.speakerName')}
               className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
             />
             <button
@@ -271,7 +273,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-600">カラー:</span>
+            <span className="text-xs text-slate-600">{t('speaker.color')}:</span>
             <div className="flex gap-2">
               {SPEAKER_COLORS.map(color => (
                 <button
@@ -287,13 +289,13 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
         </div>
 
         <div>
-          <h3 className="text-sm font-medium text-slate-700 mb-3">登録済み話者</h3>
+          <h3 className="text-sm font-medium text-slate-700 mb-3">{t('speaker.registeredSpeakers')}</h3>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
             </div>
           ) : speakers.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">まだ話者が登録されていません</p>
+            <p className="text-slate-500 text-center py-8">{t('speaker.noSpeakers')}</p>
           ) : (
             <div className="space-y-3">
               {speakers.map(speaker => (
@@ -310,7 +312,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
                   <div className="flex-1">
                     <p className="font-medium text-slate-900">{speaker.name}</p>
                     <p className="text-xs text-slate-500">
-                      {new Date(speaker.created_at).toLocaleDateString('ja-JP')}
+                      {new Date(speaker.created_at).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -327,7 +329,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
                         onClick={() => startRecording(speaker.id)}
                         disabled={isRecording}
                         className="flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="音声を登録"
+                        title={t('speaker.registerVoice')}
                       >
                         <Mic className="w-4 h-4" />
                       </button>
@@ -335,7 +337,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
                     <button
                       onClick={() => deleteSpeaker(speaker.id)}
                       className="text-slate-400 hover:text-red-600 transition"
-                      title="削除"
+                      title={t('speaker.delete')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -348,8 +350,7 @@ export function SpeakerManagement({ onClose }: SpeakerManagementProps) {
 
         <div className="mt-6 pt-6 border-t border-slate-200">
           <p className="text-xs text-slate-500">
-            <strong>使い方:</strong> 話者を追加後、マイクボタンで3〜5秒程度の音声サンプルを録音してください。
-            録音された音声は話者認識に使用されます。
+            <strong>{t('speaker.usage')}:</strong> {t('speaker.usageDesc')}
           </p>
         </div>
       </div>

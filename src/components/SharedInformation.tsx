@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Info, Plus, Trash2, Edit2, Check, X, Sparkles } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SharedInfoItem {
   id: string;
@@ -13,6 +14,7 @@ interface SharedInformationProps {
 }
 
 export function SharedInformation({ items, onUpdate }: SharedInformationProps) {
+  const { t } = useLanguage();
   const [newItemText, setNewItemText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -78,8 +80,8 @@ export function SharedInformation({ items, onUpdate }: SharedInformationProps) {
             <Info className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Topic</h2>
-            <p className="text-sm text-white/80">会議で共有された情報</p>
+            <h2 className="text-xl font-bold text-white">{t('sharedInfo.topic')}</h2>
+            <p className="text-sm text-white/80">{t('sharedInfo.title')}</p>
           </div>
         </div>
 
@@ -90,7 +92,7 @@ export function SharedInformation({ items, onUpdate }: SharedInformationProps) {
               value={newItemText}
               onChange={(e) => setNewItemText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="情報を追加..."
+              placeholder={t('sharedInfo.placeholder')}
               className="flex-1 px-4 py-3 bg-white/90 backdrop-blur-sm border-0 rounded-lg focus:ring-2 focus:ring-white/50 outline-none placeholder:text-slate-400 text-slate-900"
             />
             <button
@@ -106,9 +108,9 @@ export function SharedInformation({ items, onUpdate }: SharedInformationProps) {
           {items.length === 0 ? (
             <div className="text-center py-12">
               <Sparkles className="w-12 h-12 text-white/40 mx-auto mb-3" />
-              <p className="text-white/80">まだ情報共有がありません</p>
+              <p className="text-white/80">{t('sharedInfo.noInfo')}</p>
               <p className="text-white/60 text-sm mt-1">
-                文字起こし完了後、AIが自動で抽出します
+                {t('sharedInfo.autoExtract')}
               </p>
             </div>
           ) : (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecording } from '../contexts/RecordingContext';
 import { useProjects } from '../contexts/ProjectContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { Settings as SettingsIcon, LogOut, Mic, Square, Plus, Calendar, Loader2, Trash2, Users, Folder, X, Check, Palette } from 'lucide-react';
 import { Settings } from './Settings';
@@ -20,6 +21,7 @@ interface Meeting {
 
 export function Home() {
   const { user, signOut } = useAuth();
+  const { language, t } = useLanguage();
   const { isRecording, recordingTime, recordingMeetingId, startRecording, stopRecording } = useRecording();
   const { projects, selectedProjectId, setSelectedProjectId, createProject, deleteProject, updateProject } = useProjects();
   const [showSettings, setShowSettings] = useState(false);
@@ -144,7 +146,7 @@ export function Home() {
 
   const startQuickRecording = async () => {
     if (!geminiApiKey) {
-      alert('Gemini APIキーを設定してください');
+      alert(t('errors.apiKeyRequired'));
       setShowSettings(true);
       return;
     }
@@ -152,7 +154,7 @@ export function Home() {
     try {
       const meetingData: any = {
         user_id: user?.id,
-        title: `新しい会議 - ${new Date().toLocaleDateString('ja-JP')}`,
+        title: `${t('home.newMeeting')} - ${new Date().toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US')}`,
       };
 
       if (selectedProjectId) {
@@ -168,13 +170,13 @@ export function Home() {
       if (error) throw error;
 
       await startRecording(newMeeting.id, () => {
-        alert('10分間音声が検出されなかったため、録音を自動停止しました。');
+        alert(t('home.autoStopMessage'));
         handleStopRecording();
       });
       setSelectedMeetingId(newMeeting.id);
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('録音の開始に失敗しました');
+      alert(t('home.startRecordingError'));
     }
   };
 
@@ -185,7 +187,7 @@ export function Home() {
       await processRecording(segments, recordingMeetingId || undefined);
     } catch (error) {
       console.error('Error stopping recording:', error);
-      alert('録音の停止に失敗しました');
+      alert(t('home.stopRecordingError'));
     }
   };
 
@@ -200,7 +202,7 @@ export function Home() {
       console.log(`Transcribing segment ${segmentIndex + 1}, size: ${segmentSizeMB.toFixed(2)} MB, attempt ${retryCount + 1}`);
 
       if (segmentSizeMB > 20) {
-        throw new Error(`セグメント${segmentIndex + 1}のサイズが大きすぎます（${segmentSizeMB.toFixed(2)} MB）。録音を短い時間で区切ってください。`);
+        throw new Error(t('errors.segmentTooLarge', { index: segmentIndex + 1, size: segmentSizeMB.toFixed(2) }));
       }
 
       const reader = new FileReader();
@@ -230,7 +232,7 @@ export function Home() {
                   }
                 },
                 {
-                  text: 'この音声ファイルを日本語で文字起こししてください。話された内容をそのまま正確にテキスト化してください。'
+                  text: t('prompts.transcription')
                 }
               ]
             }]
@@ -257,14 +259,14 @@ export function Home() {
             return transcribeSegmentWithRetry(segmentBlob, segmentIndex, retryCount + 1);
           } else {
             if (statusCode === 503) {
-              throw new Error(`セグメント${segmentIndex + 1}: Gemini APIが現在過負荷状態です（503エラー）。数分待ってから再度お試しください。`);
+              throw new Error(t('errors.apiOverloaded'));
             } else {
-              throw new Error(`セグメント${segmentIndex + 1}: レート制限に達しました。Gemini APIは1分間に15回までです。数分待ってから再度お試しください。`);
+              throw new Error(t('errors.rateLimit'));
             }
           }
         }
 
-        throw new Error(`セグメント${segmentIndex + 1}の文字起こしエラー: ${errorMsg}`);
+        throw new Error(t('errors.transcriptionFailed', { index: segmentIndex + 1, error: errorMsg }));
       }
 
       const transcriptionData = await transcriptionResponse.json();
@@ -299,17 +301,17 @@ export function Home() {
 
       if (!geminiApiKey || geminiApiKey.trim() === '') {
         console.error('API key is missing or empty!');
-        throw new Error('Gemini APIキーが設定されていません。設定画面からAPIキーを登録してください。');
+        throw new Error(t('errors.apiKeyMissing'));
       }
 
       if (segments.length === 0) {
-        throw new Error('録音データが空です。マイクの権限を確認してください。');
+        throw new Error(t('errors.recordingEmpty'));
       }
 
       console.log(`Processing ${segments.length} segment(s)`);
 
       // Always save audio to Supabase Storage
-      setProcessingStep('音声ファイルを保存中...');
+      setProcessingStep(t('common.saving'));
       const audioUrls: string[] = [];
       const timestamp = Date.now();
       audioSize = 0;
@@ -325,7 +327,7 @@ export function Home() {
 
         if (uploadError) {
           console.error(`Failed to upload segment ${i + 1}:`, uploadError);
-          throw new Error(`音声セグメント${i + 1}のアップロードに失敗しました: ${uploadError.message}`);
+          throw new Error(t('errors.uploadSegmentFailed', { index: i + 1, error: uploadError.message }));
         }
         audioUrls.push(audioFileName);
       }
@@ -374,7 +376,7 @@ export function Home() {
 
         if (updateError) {
           console.error('Failed to update meeting with audio info:', updateError);
-          throw new Error(`会議レコードの更新に失敗しました: ${updateError.message}`);
+          throw new Error(t('errors.updateMeetingFailed', { error: updateError.message }));
         }
         console.log('Meeting record updated with audio info:', meetingId);
         await loadMeetings();
@@ -395,10 +397,10 @@ export function Home() {
         // Using 10 seconds to avoid service overload (503 errors)
         const waitTime = 10000;
         console.log(`Waiting ${waitTime / 1000} seconds before API call (rate limit: 15/min, avoiding 503)...`);
-        setProcessingStep(`API過負荷回避のため${waitTime / 1000}秒待機中... (${i + 1}/${segments.length})`);
+        setProcessingStep(`${t('common.processing')} (${i + 1}/${segments.length})`);
         await sleep(waitTime);
 
-        setProcessingStep(`セグメント ${i + 1}/${segments.length} を文字起こし中...`);
+        setProcessingStep(`${t('common.processing')} (${t('meeting.part')} ${i + 1}/${segments.length})...`);
         console.log(`Processing segment ${i + 1}, size: ${segmentSizeMB.toFixed(2)} MB`);
 
         const segmentTranscript = await transcribeSegmentWithRetry(segment, i);
@@ -411,15 +413,15 @@ export function Home() {
       const transcript = combinedTranscript.trim();
 
       if (!transcript) {
-        throw new Error('文字起こし結果が空です。音声が録音されていない可能性があります。');
+        throw new Error(t('errors.transcriptionEmpty'));
       }
 
       // Wait before calling formatting API to respect rate limits and avoid 503 errors
       console.log('Waiting 10 seconds before formatting API call...');
-      setProcessingStep('API過負荷回避のため10秒待機中...');
+      setProcessingStep(t('common.processing'));
       await sleep(10000);
 
-      setProcessingStep('議事録を作成中...');
+      setProcessingStep(t('common.processing'));
 
       let formattingResponse;
       let formattingRetries = 0;
@@ -435,83 +437,7 @@ export function Home() {
               body: JSON.stringify({
                 contents: [{
                   parts: [{
-                    text: `あなたはプロフェッショナルな議事録作成アシスタントです。以下の音声文字起こしデータを、読みやすく構造化された議事録に変換してください。
-
-## 重要な指示
-
-### 文章整形ルール（必須）：
-1. **話し言葉を書き言葉に変換**
-   - 「はい」「うん」「ええ」などの相槌は削除
-   - 「〜じゃん」→「〜です」
-   - 「〜かも」→「〜の可能性があります」
-   - 「〜って感じ」→「〜という状況です」
-   - 文末は「です・ます」調で統一
-
-2. **冗長表現の整理**
-   - 重複する内容は統合
-   - 「あの」「えっと」などのフィラーは削除
-   - 不完全な文は完全な文に整形
-
-3. **内容の構造化**
-   - 関連する話題をまとめる
-   - 時系列や論理的な順序で整理
-   - 重要度に応じて見出しを付ける
-
-### 出力フォーマット：
-
-マークダウン形式で以下の構造に従ってください：
-
-## 目次
-- [概要](#概要)
-- [議論された主要テーマ1](#議論された主要テーマ1)
-- [議論された主要テーマ2](#議論された主要テーマ2)
-（必要に応じて追加）
-
-## 概要
-会議全体の要約を3-5文で記載
-
-## 議論された主要テーマ1
-整形された内容（話し言葉を書き言葉に変換済み）
-
-## 議論された主要テーマ2
-整形された内容（話し言葉を書き言葉に変換済み）
-
-### 注意事項：
-- すべての会話内容を漏らさず、**整形して**記載
-- 見出しは必ず ## （h2）を使用
-- 目次のリンクは見出しIDと一致させる
-- 相槌や無意味な繰り返しは除外
-- 文章は簡潔で読みやすく
-
----
-
-次に、以下の3つの情報をJSON形式で抽出してください：
-
-1. **決定事項**：会議で決まったこと、合意された事項、結論
-2. **TODOリスト**：今後やるべきタスク、アクションアイテム、担当者が決まっている作業
-3. **重要な情報共有**：新しい知識、事実、問題点、課題、参考情報（TODOと重複しないこと）
-
-議事録の後に、以下のフォーマットで出力してください：
-
----DECISIONS---
-["決定事項1", "決定事項2", "決定事項3"]
----END_DECISIONS---
-
----TODO_LIST---
-["タスク1", "タスク2", "タスク3"]
----END_TODO_LIST---
-
----SHARED_INFO---
-["情報1", "情報2", "情報3"]
----END_SHARED_INFO---
-
-注意：重要な情報共有にはTODOと同じ内容を含めないこと。該当項目がない場合は空配列 [] を返すこと。
-
----
-
-文字起こしデータ：
-
-${transcript}`
+                    text: t('prompts.minutes', { transcript })
                   }]
                 }]
               })
@@ -530,20 +456,20 @@ ${transcript}`
             if (formattingRetries < maxFormattingRetries) {
               const delay = 10000 * Math.pow(2, formattingRetries - 1);
               console.log(`Formatting API overloaded, retrying in ${delay / 1000} seconds...`);
-              setProcessingStep(`議事録生成中 - API過負荷により${delay / 1000}秒待機... (${formattingRetries}/${maxFormattingRetries})`);
+              setProcessingStep(`${t('common.processing')} (${formattingRetries}/${maxFormattingRetries})`);
               await sleep(delay);
               continue;
             }
           }
 
-          throw new Error(`議事録の生成に失敗しました: ${errorMsg}`);
+          throw new Error(t('errors.minutesGenerationFailed'));
         } catch (error) {
           if (formattingRetries < maxFormattingRetries - 1 && error instanceof Error &&
             (error.message.includes('overloaded') || error.message.includes('quota') || error.message.includes('rate limit'))) {
             formattingRetries++;
             const delay = 10000 * Math.pow(2, formattingRetries - 1);
             console.log(`Formatting error, retrying in ${delay / 1000} seconds...`);
-            setProcessingStep(`議事録生成中 - エラー発生、${delay / 1000}秒後に再試行... (${formattingRetries}/${maxFormattingRetries})`);
+            setProcessingStep(`${t('common.processing')} (${formattingRetries}/${maxFormattingRetries})`);
             await sleep(delay);
             continue;
           }
@@ -552,7 +478,7 @@ ${transcript}`
       }
 
       if (!formattingResponse || !formattingResponse.ok) {
-        throw new Error('議事録の生成に失敗しました');
+        throw new Error(t('errors.minutesGenerationFailed'));
       }
 
       const formattingData = await formattingResponse.json();
@@ -594,9 +520,9 @@ ${transcript}`
         }
       }
 
-      setProcessingStep('タイトル生成中...');
+      setProcessingStep(t('common.processing'));
 
-      let title = `会議 - ${new Date().toLocaleDateString('ja-JP')}`;
+      let title = `Meeting - ${new Date().toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US')}`;
       const titleResponse = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-meeting-title`,
         {
@@ -608,6 +534,7 @@ ${transcript}`
           body: JSON.stringify({
             content: formattedMinutes,
             apiKey: geminiApiKey,
+            language: language,
           }),
         }
       );
@@ -617,7 +544,7 @@ ${transcript}`
         title = titleData.title || title;
       }
 
-      setProcessingStep('保存中...');
+      setProcessingStep(t('common.saving'));
 
       const initialTodos = extractedTodos.map(todo => ({
         id: crypto.randomUUID(),
@@ -658,7 +585,7 @@ ${transcript}`
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      const errorMessage = error instanceof Error ? error.message : '録音の処理に失敗しました。APIキーを確認してください。';
+      const errorMessage = error instanceof Error ? error.message : t('errors.processingFailed');
 
       // Update meeting record with error status if we have a temp meeting
       if (tempMeetingId) {
@@ -688,11 +615,11 @@ ${transcript}`
         .single();
 
       if (fetchError || !meeting?.audio_url) {
-        throw new Error('音声データが見つかりません。');
+        throw new Error(t('home.noAudio'));
       }
 
       setProcessing(true);
-      setProcessingStep('音声ファイルをダウンロード中...');
+      setProcessingStep(t('home.downloadingAudio'));
 
       let urls: string[] = [];
       try {
@@ -712,7 +639,7 @@ ${transcript}`
           .download(url);
 
         if (downloadError || !audioData) {
-          throw new Error(`音声ファイルのダウンロードに失敗しました: ${url}`);
+          throw new Error(t('home.downloadAudioError'));
         }
         segments.push(audioData);
       }
@@ -720,8 +647,8 @@ ${transcript}`
       await processRecording(segments, meetingId);
     } catch (error) {
       console.error('Error retrying transcription:', error);
-      const errorMessage = error instanceof Error ? error.message : '再試行に失敗しました。';
-      alert(`エラー: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : t('home.retryError');
+      alert(`Error: ${errorMessage}`);
     }
   };
 
@@ -753,21 +680,21 @@ ${transcript}`
       setNewProjectColor('#3B82F6');
       setShowProjectModal(false);
     } catch (error) {
-      alert('プロジェクトの作成に失敗しました');
+      alert(t('home.projectCreateError'));
     }
   };
 
   const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (!confirm('このプロジェクトを削除しますか？プロジェクト内の会議は残りますが、プロジェクトとの関連付けが解除されます。')) {
+    if (!confirm(t('home.projectDeleteConfirm'))) {
       return;
     }
 
     try {
       await deleteProject(projectId);
     } catch (error) {
-      alert('プロジェクトの削除に失敗しました');
+      alert(t('home.projectDeleteError'));
     }
   };
 
@@ -790,7 +717,7 @@ ${transcript}`
       setEditingProjectName('');
       setEditingProjectColor('');
     } catch (error) {
-      alert('プロジェクト名の変更に失敗しました');
+      alert(t('home.projectUpdateError'));
     }
   };
 
@@ -939,14 +866,14 @@ ${transcript}`
                     onClick={(e) => startEditingProject(project.id, project.name, project.color, e)}
                     className="absolute -top-2 -right-10 p-1.5 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-xl backdrop-blur-sm border-2 border-white/30 z-20"
                     style={{ backgroundColor: project.color }}
-                    aria-label="編集"
+                    aria-label={t('common.edit')}
                   >
                     <Palette className="w-3.5 h-3.5 drop-shadow-lg" />
                   </button>
                   <button
                     onClick={(e) => handleDeleteProject(project.id, e)}
                     className="absolute -top-2 -right-2 p-1.5 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-xl backdrop-blur-sm border-2 border-white/30 z-20"
-                    aria-label="削除"
+                    aria-label={t('common.delete')}
                   >
                     <X className="w-3.5 h-3.5 drop-shadow-lg" />
                   </button>
@@ -970,7 +897,7 @@ ${transcript}`
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-cyan-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <div className="relative flex items-center justify-center gap-4">
               <Plus className="w-8 h-8" />
-              <span className="text-2xl font-bold">新しい会議を作成</span>
+              <span className="text-2xl font-bold">{t('home.createNewMeeting')}</span>
             </div>
           </button>
 
@@ -982,16 +909,16 @@ ${transcript}`
             <div className="text-center py-20">
               <Calendar className="w-24 h-24 text-slate-300 mx-auto mb-6" />
               <h3 className="text-2xl font-bold text-slate-900 mb-3">
-                {selectedProjectId ? 'このプロジェクトに会議がありません' : 'まだ会議がありません'}
+                {selectedProjectId ? t('home.noMeetingsInProject') : t('home.noMeetings')}
               </h3>
               <p className="text-slate-500 text-lg">
-                上のボタンから{selectedProjectId ? 'このプロジェクトの' : '最初の'}会議を作成しましょう
+                {selectedProjectId ? t('home.createFirstMeetingInProject') : t('home.createFirstMeeting')}
               </p>
             </div>
           ) : (
             <div>
               <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-orange-600 bg-clip-text text-transparent mb-8">
-                {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name || 'プロジェクト' : 'すべての会議'}
+                {selectedProjectId ? projects.find(p => p.id === selectedProjectId)?.name || t('home.project') : t('home.allMeetings')}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredMeetings.map((meeting) => (
@@ -1010,7 +937,7 @@ ${transcript}`
                           </div>
                         </div>
                         <p className="text-base text-slate-700 font-medium">
-                          {new Date(meeting.created_at).toLocaleDateString('ja-JP', {
+                          {new Date(meeting.created_at).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',
@@ -1019,14 +946,14 @@ ${transcript}`
                       </div>
                       <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
                         <h3 className="font-bold text-slate-900 text-lg group-hover:bg-gradient-to-r group-hover:from-cyan-600 group-hover:to-blue-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
-                          {meeting.title || '無題の会議'}
+                          {meeting.title || t('meeting.untitled')}
                         </h3>
                       </div>
                     </button>
                     <button
                       onClick={(e) => deleteMeeting(meeting.id, e)}
                       className="absolute top-4 right-4 p-3 bg-white/90 backdrop-blur-sm rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-red-50 hover:text-red-600 hover:scale-110 border border-white"
-                      aria-label="削除"
+                      aria-label={t('common.delete')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1055,7 +982,7 @@ ${transcript}`
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border-2 border-white/50">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-slate-900">新しいプロジェクト</h2>
+              <h2 className="text-2xl font-bold text-slate-900">{t('home.newProject')}</h2>
               <button
                 onClick={() => {
                   setShowProjectModal(false);
@@ -1071,14 +998,14 @@ ${transcript}`
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
-              placeholder="プロジェクト名"
+              placeholder={t('home.projectNamePlaceholder')}
               className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-cyan-500 focus:outline-none mb-4"
               autoFocus
             />
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-2">
                 <Palette className="w-4 h-4 text-slate-600" />
-                <label className="text-sm font-medium text-slate-700">色を選択</label>
+                <label className="text-sm font-medium text-slate-700">{t('home.selectColor')}</label>
               </div>
               <ColorPicker
                 selectedColor={newProjectColor}
@@ -1093,14 +1020,14 @@ ${transcript}`
                 }}
                 className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all font-medium"
               >
-                キャンセル
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleCreateProject}
                 disabled={!newProjectName.trim()}
                 className="flex-1 px-6 py-3 bg-gradient-to-br from-cyan-400 to-blue-500 text-white rounded-xl hover:from-cyan-500 hover:to-blue-600 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                作成
+                {t('common.create')}
               </button>
             </div>
           </div>
@@ -1164,10 +1091,10 @@ ${transcript}`
               </svg>
             </div>
             <p className="text-slate-900 font-bold text-2xl text-center mb-3">
-              {processingStep || '処理中...'}
+              {processingStep || t('common.processing')}
             </p>
             <p className="text-slate-600 text-center text-lg">
-              Gemini APIで処理しています
+              {t('home.processingWithGemini')}
             </p>
           </div>
         </div>

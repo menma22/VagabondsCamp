@@ -9,6 +9,7 @@ const corsHeaders = {
 interface RequestPayload {
   content: string;
   apiKey: string;
+  language?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,7 +21,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { content, apiKey }: RequestPayload = await req.json();
+    const { content, apiKey, language }: RequestPayload = await req.json();
+    const lang = language || 'ja';
 
     if (!apiKey) {
       return new Response(
@@ -48,7 +50,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const prompt = `以下の会議内容から、簡潔で分かりやすい会議タイトルを生成してください。タイトルは20文字以内で、会議の主要なトピックを表現してください。タイトルのみを返してください。\n\n会議内容:\n${content.substring(0, 1000)}`;
+    const prompt = lang === 'en'
+      ? `Please generate a concise and clear meeting title from the following meeting content. The title should be within 50 characters and represent the main topic of the meeting. Return only the title.\n\nMeeting Content:\n${content.substring(0, 1000)}`
+      : `以下の会議内容から、簡潔で分かりやすい会議タイトルを生成してください。タイトルは20文字以内で、会議の主要なトピックを表現してください。タイトルのみを返してください。\n\n会議内容:\n${content.substring(0, 1000)}`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,

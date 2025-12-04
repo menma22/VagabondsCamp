@@ -1,4 +1,5 @@
 
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Meeting {
   id: string;
@@ -45,6 +46,9 @@ export function MonthView({
   onSelectMeeting,
   onEventClick,
 }: MonthViewProps) {
+  const { t } = useLanguage();
+  const weekDays = t('monthView.weekDays') as string[];
+
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -178,7 +182,7 @@ export function MonthView({
           ))}
           {(dayEvents.length + dayMeetings.length) > 4 && (
             <div className="text-[10px] text-slate-600 px-1.5 font-medium">
-              +{dayEvents.length + dayMeetings.length - 4}件
+              +{dayEvents.length + dayMeetings.length - 4}{t('monthView.items')}
             </div>
           )}
         </div>
@@ -227,7 +231,7 @@ export function MonthView({
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="grid grid-cols-7 border-b border-slate-300 flex-shrink-0 bg-slate-50">
-        {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => (
+        {weekDays.map((day: string, index: number) => (
           <div
             key={day}
             className={`py-2.5 text-center text-xs font-semibold uppercase ${index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-slate-700'

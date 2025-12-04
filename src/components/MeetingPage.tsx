@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecording } from '../contexts/RecordingContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { downloadAudioFromStorage } from '../lib/audioUpload';
 import { markMeetingAsProcessing } from '../lib/meetingHelpers';
@@ -68,6 +69,7 @@ interface MeetingData {
 
 export function MeetingPage({ meetingId, onClose, onRetryTranscription }: MeetingPageProps) {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const { isRecording, recordingTime, recordingMeetingId, startRecording, stopRecording } = useRecording();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -235,7 +237,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
   const handleStartRecording = async () => {
     if (!geminiApiKey) {
-      alert('Gemini APIキーを設定してください');
+      alert(t('errors.apiKeyRequired'));
       return;
     }
 
@@ -243,7 +245,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       await startRecording(meetingId);
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('録音の開始に失敗しました');
+      alert(t('home.startRecordingError'));
     }
   };
 
@@ -253,7 +255,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       await processRecording(segments);
     } catch (error) {
       console.error('Error stopping recording:', error);
-      alert('録音の停止に失敗しました');
+      alert(t('home.stopRecordingError'));
     }
   };
 
@@ -263,7 +265,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
     // File APIは2GBまで対応（inline_dataの20MB制限を大幅に緩和）
     if (segmentSizeMB > 100) {
-      throw new Error(`セグメント${segmentIndex + 1}のサイズが大きすぎます（${segmentSizeMB.toFixed(2)} MB）。`);
+      throw new Error(t('errors.segmentTooLarge', { index: segmentIndex + 1, size: segmentSizeMB.toFixed(2) }));
     }
 
     // ステップ1: File APIにアップロード
@@ -284,7 +286,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       const errorData = await uploadResponse.json().catch(() => null);
       console.error('File upload error:', errorData);
       const errorMsg = errorData?.error?.message || uploadResponse.statusText;
-      throw new Error(`セグメント${segmentIndex + 1}のファイルアップロードに失敗しました: ${errorMsg}`);
+      throw new Error(t('errors.uploadFailed', { index: segmentIndex + 1, error: errorMsg }));
     }
 
     const fileData = await uploadResponse.json();
@@ -307,7 +309,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
                 }
               },
               {
-                text: 'この音声ファイルを日本語で文字起こししてください。話された内容をそのまま正確にテキスト化してください。'
+                text: t('prompts.transcription')
               }
             ]
           }]
@@ -319,7 +321,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       const errorData = await transcriptionResponse.json().catch(() => null);
       console.error('Transcription error:', errorData);
       const errorMsg = errorData?.error?.message || transcriptionResponse.statusText;
-      throw new Error(`セグメント${segmentIndex + 1}の文字起こしに失敗しました: ${errorMsg}`);
+      throw new Error(t('errors.transcriptionFailed', { index: segmentIndex + 1, error: errorMsg }));
     }
 
     const transcriptionData = await transcriptionResponse.json();
@@ -333,17 +335,17 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
     try {
       if (!geminiApiKey || geminiApiKey.trim() === '') {
-        throw new Error('Gemini APIキーが設定されていません。設定画面からAPIキーを登録してください。');
+        throw new Error(t('errors.apiKeyMissing'));
       }
 
       if (segments.length === 0) {
-        throw new Error('録音データが空です。マイクの権限を確認してください。');
+        throw new Error(t('errors.recordingEmpty'));
       }
 
       console.log(`Processing ${segments.length} segment(s)`);
 
       // Save audio segments to Supabase Storage
-      setProcessingStep('音声ファイルを保存中...');
+      setProcessingStep(t('common.saving'));
       const audioUrls: string[] = [];
       const segmentBlobs: Blob[] = [];
       let totalSize = 0;
@@ -362,7 +364,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
         if (uploadError) {
           console.error(`Failed to upload segment ${i + 1}:`, uploadError);
-          throw new Error(`音声セグメント${i + 1}のアップロードに失敗しました: ${uploadError.message}`);
+          throw new Error(t('errors.uploadSegmentFailed', { index: i + 1, error: uploadError.message }));
         }
 
         audioUrls.push(audioFileName);
@@ -386,7 +388,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
 
       if (updateError) {
         console.error('Failed to update meeting with audio info:', updateError);
-        throw new Error(`会議レコードの更新に失敗しました: ${updateError.message}`);
+        throw new Error(t('errors.updateMeetingFailed', { error: updateError.message }));
       }
 
       console.log('Meeting record updated with audio info');
@@ -403,7 +405,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       let combinedTranscript = '';
 
       for (let i = 0; i < segmentBlobs.length; i++) {
-        setProcessingStep(`文字起こし中 (パート ${i + 1}/${segmentBlobs.length})...`);
+        setProcessingStep(`${t('common.processing')} (${t('meeting.part')} ${i + 1}/${segmentBlobs.length})...`);
         const text = await transcribeSegment(segmentBlobs[i], i);
         combinedTranscript += text + '\n\n';
       }
@@ -411,10 +413,10 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       const transcript = combinedTranscript.trim();
 
       if (!transcript) {
-        throw new Error('文字起こし結果が空です。音声が録音されていない可能性があります。');
+        throw new Error(t('errors.transcriptionEmpty'));
       }
 
-      setProcessingStep('議事録を作成中...');
+      setProcessingStep(t('common.processing'));
 
       const formattingResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -426,59 +428,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
               {
                 parts: [
                   {
-                    text: `以下の文字起こしを構造的に整理され、全ての内容をキャッチアップした、その会話内容に最も最適な議事録に変換してください。
-
-必須フォーマット：
-1. 目次（見出しへのリンク付き）
-2. 内容（複数の見出しで構造化）
-
-マークダウン形式で以下の構造に従ってください、目次と概要は必須項目です。その他の項目は適切なものを自分で考えてください：
-
-## 目次
-- [概要](#概要)必須項目
--
--
-
-
-## 概要
-（ここに概要を記載）
-
-##
-
-##
-
-注意事項：
-- 会話内容はすべて漏らさず記載してください
-- 見出しは必ず ## （h2）を使用してください
-- 目次のリンクは必ず # で始まる見出しIDと一致させてください
-
-
-次に、以下の3つの情報をJSON形式で抽出してください：
-
-1. 決定事項（会議で決まったこと、合意された事項、結論）
-2. TODOリスト（今後やるべきタスク、アクションアイテム）
-3. 重要な情報共有（新しい知識や事実、問題や課題、参考になる情報）
-
-議事録の後に、以下のフォーマットで出力してください：
-
----DECISIONS---
-["決定事項1", "決定事項2", "決定事項3"]
----END_DECISIONS---
-
----TODO_LIST---
-["タスク1", "タスク2", "タスク3"]
----END_TODO_LIST---
-
----SHARED_INFO---
-["情報1", "情報2", "情報3"]
----END_SHARED_INFO---
-
-注意事項：
--重要な情報共有にはTODOと同じ内容は含めないでください。
-
-文字起こし：
-
-${transcript}`,
+                    text: t('prompts.minutes', { transcript }),
                   },
                 ],
               },
@@ -488,7 +438,7 @@ ${transcript}`,
       );
 
       if (!formattingResponse.ok) {
-        throw new Error('議事録の生成に失敗しました');
+        throw new Error(t('errors.minutesGenerationFailed'));
       }
 
       const formattingData = await formattingResponse.json();
@@ -530,9 +480,9 @@ ${transcript}`,
         }
       }
 
-      setProcessingStep('タイトル生成中...');
+      setProcessingStep(t('common.processing'));
 
-      let title = meeting.title || `会議 - ${new Date().toLocaleDateString('ja-JP')}`;
+      let title = meeting.title || `Meeting - ${new Date().toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US')}`;
       const titleResponse = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-meeting-title`,
         {
@@ -544,6 +494,7 @@ ${transcript}`,
           body: JSON.stringify({
             content: formattedMinutes,
             apiKey: geminiApiKey,
+            language: language,
           }),
         }
       );
@@ -553,7 +504,7 @@ ${transcript}`,
         title = titleData.title || title;
       }
 
-      setProcessingStep('保存中...');
+      setProcessingStep(t('common.saving'));
 
       const { error } = await supabase
         .from('meetings')
@@ -605,7 +556,7 @@ ${transcript}`,
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      const errorMessage = error instanceof Error ? error.message : '録音の処理に失敗しました。APIキーを確認してください。';
+      const errorMessage = error instanceof Error ? error.message : t('errors.processingFailed');
 
       // Update local state to failed
       setMeeting(prev => ({
@@ -658,19 +609,19 @@ ${transcript}`,
             className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-all shadow-sm border border-slate-200 hover:shadow-md"
           >
             <ArrowLeft className="w-5 h-5" />
-            戻る
+            {t('common.back')}
           </button>
           <input
             type="text"
             value={meeting.title}
             onChange={(e) => updateTitle(e.target.value)}
             className="flex-1 text-3xl font-bold text-slate-900 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-slate-900 outline-none transition px-2 py-1"
-            placeholder="会議のタイトル"
+            placeholder={t('meeting.titlePlaceholder')}
           />
           {saving && (
             <div className="flex items-center gap-2 text-slate-500 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
-              保存中...
+              {t('common.saving')}
             </div>
           )}
         </div>
@@ -708,15 +659,15 @@ ${transcript}`,
                         </div>
                         <div>
                           <div className="font-medium text-slate-900">
-                            音声データ {urls.length > 1 ? `(パート ${idx + 1})` : ''}: {idx === 0 && meeting.audio_size ? `${(meeting.audio_size / (1024 * 1024)).toFixed(2)} MB (合計)` : ''}
+                            {t('meeting.audioData')} {urls.length > 1 ? `(${t('meeting.part')} ${idx + 1})` : ''}: {idx === 0 && meeting.audio_size ? `${(meeting.audio_size / (1024 * 1024)).toFixed(2)} MB (${t('meeting.total')})` : ''}
                           </div>
                           <div className={`text-sm ${meeting.transcription_status === 'completed' ? 'text-green-600' :
                             meeting.transcription_status === 'failed' ? 'text-red-600' :
                               'text-blue-600'
                             }`}>
-                            {meeting.transcription_status === 'completed' && '文字起こし完了'}
-                            {meeting.transcription_status === 'failed' && `文字起こし失敗: ${meeting.transcription_error || '不明なエラー'}`}
-                            {meeting.transcription_status === 'processing' && '処理中...'}
+                            {meeting.transcription_status === 'completed' && t('meeting.transcriptionCompleted')}
+                            {meeting.transcription_status === 'failed' && `${t('meeting.transcriptionFailed')}: ${meeting.transcription_error || 'Unknown error'}`}
+                            {meeting.transcription_status === 'processing' && t('common.processing')}
                           </div>
                         </div>
                       </div>
@@ -740,7 +691,7 @@ ${transcript}`,
                               document.body.removeChild(a);
                             } catch (error) {
                               console.error('Download failed:', error);
-                              alert('音声ファイルのダウンロードに失敗しました');
+                              alert(t('home.downloadAudioError'));
                             }
                           }}
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -748,7 +699,7 @@ ${transcript}`,
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
-                          ダウンロード
+                          {t('common.download')}
                         </button>
                         {idx === 0 && meeting.transcription_status === 'failed' && onRetryTranscription && (
                           <button
@@ -759,7 +710,7 @@ ${transcript}`,
                             className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                           >
                             <Loader2 className="w-4 h-4" />
-                            再試行
+                            {t('common.retry')}
                           </button>
                         )}
                       </div>
@@ -781,7 +732,7 @@ ${transcript}`,
                 <div className="bg-white/30 backdrop-blur-sm p-3 rounded-xl">
                   <LinkIcon className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-white">参考URL</h2>
+                <h2 className="text-xl font-bold text-white">{t('meeting.referenceUrls')}</h2>
               </div>
 
               <div className="space-y-2 mb-4">
@@ -789,7 +740,7 @@ ${transcript}`,
                   type="text"
                   value={newUrlTitle}
                   onChange={(e) => setNewUrlTitle(e.target.value)}
-                  placeholder="タイトル（任意）"
+                  placeholder={t('meeting.urlTitlePlaceholder')}
                   className="w-full px-4 py-2 bg-white/90 backdrop-blur-sm border-0 rounded-lg focus:ring-2 focus:ring-white/50 outline-none placeholder:text-slate-400"
                 />
                 <div className="flex gap-2">

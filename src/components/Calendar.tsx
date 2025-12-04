@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { EventForm } from './EventForm';
 import { MonthView } from './MonthView';
@@ -37,6 +38,7 @@ type ViewMode = 'month' | 'day';
 
 export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -267,7 +269,7 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
             }}
             className="px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition border border-slate-300"
           >
-            今日
+            {t('calendar.today')}
           </button>
           <button
             onClick={viewMode === 'month' ? handlePreviousMonth : handlePreviousDay}
@@ -286,12 +288,12 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
         <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2">
           {viewMode === 'month' ? (
             <h2 className="text-xl font-semibold text-slate-900">
-              {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
+              {currentDate.getFullYear()}{t('calendar.year')} {currentDate.getMonth() + 1}{t('calendar.month')}
             </h2>
           ) : (
             <h2 className="text-xl font-semibold text-slate-900 flex items-baseline gap-1">
-              <span>{currentDate.getFullYear()}年{currentDate.getMonth() + 1}月</span>
-              <span className="text-3xl font-bold">{currentDate.getDate()}日</span>
+              <span>{currentDate.getFullYear()}{t('calendar.year')}{currentDate.getMonth() + 1}{t('calendar.month')}</span>
+              <span className="text-3xl font-bold">{currentDate.getDate()}{t('calendar.day')}</span>
               <span>({['日', '月', '火', '水', '木', '金', '土'][currentDate.getDay()]})</span>
             </h2>
           )}
@@ -306,7 +308,7 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              月
+              {t('calendar.month')}
             </button>
             <button
               onClick={() => {
@@ -321,7 +323,7 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
                 : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
-              日
+              {t('calendar.day')}
             </button>
           </div>
           <button
@@ -372,16 +374,16 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
           <div className="p-4 border-b border-slate-200 bg-slate-50">
             <h3 className="font-semibold text-slate-900">
               {selectedDate ? (
-                <>{selectedDate.getFullYear()}年{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日</>
+                <>{selectedDate.getFullYear()}{t('calendar.year')}{selectedDate.getMonth() + 1}{t('calendar.month')}{selectedDate.getDate()}{t('calendar.day')}</>
               ) : (
-                <>会議ログ</>
+                <>{t('calendar.meetingLog')}</>
               )}
             </h3>
           </div>
           <div className="p-4 space-y-6">
             {viewMode === 'day' && filteredEvents.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-slate-600 mb-3">予定</h4>
+                <h4 className="text-sm font-semibold text-slate-600 mb-3">{t('calendar.schedule')}</h4>
                 <div className="space-y-2">
                   {filteredEvents.map((event) => (
                     <button
@@ -414,7 +416,7 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
 
             {filteredMeetings.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-slate-600 mb-3">会議ログ</h4>
+                <h4 className="text-sm font-semibold text-slate-600 mb-3">{t('calendar.meetingLog')}</h4>
                 <div className="space-y-2">
                   {filteredMeetings.map((meeting) => (
                     <button

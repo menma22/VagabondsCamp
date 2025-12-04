@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Key, X, Loader2 } from 'lucide-react';
+import { Key, X, Loader2, Globe } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SettingsProps {
   onClose: () => void;
@@ -9,6 +10,7 @@ interface SettingsProps {
 
 export function Settings({ onClose }: SettingsProps) {
   const { user } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,13 +75,13 @@ export function Settings({ onClose }: SettingsProps) {
         if (error) throw error;
       }
 
-      setMessage({ type: 'success', text: '設定を保存しました！' });
+      setMessage({ type: 'success', text: t('settings.saveSuccess') });
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (error) {
       console.error('Error saving settings:', error);
-      setMessage({ type: 'error', text: '設定の保存に失敗しました' });
+      setMessage({ type: 'error', text: t('settings.saveError') });
     } finally {
       setSaving(false);
     }
@@ -105,7 +107,7 @@ export function Settings({ onClose }: SettingsProps) {
             <div className="bg-slate-900 p-2 rounded-lg">
               <Key className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">API設定</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{t('settings.title')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -117,15 +119,45 @@ export function Settings({ onClose }: SettingsProps) {
 
         <form onSubmit={handleSave} className="space-y-4">
           <div>
+            <label htmlFor="language" className="block text-sm font-medium text-slate-700 mb-1">
+              {t('settings.languageLabel')}
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLanguage('ja')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition ${language === 'ja'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+              >
+                <span className="text-lg">🇯🇵</span>
+                日本語
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition ${language === 'en'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+              >
+                <span className="text-lg">🇺🇸</span>
+                English
+              </button>
+            </div>
+          </div>
+
+          <div>
             <label htmlFor="gemini" className="block text-sm font-medium text-slate-700 mb-1">
-              Gemini APIキー
+              {t('settings.apiKeyLabel')}
             </label>
             <input
               id="gemini"
               type="text"
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey(e.target.value)}
-              placeholder="AIza..."
+              placeholder={t('settings.apiKeyPlaceholder')}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition"
             />
             <p className="text-xs text-slate-500 mt-1">
@@ -137,17 +169,16 @@ export function Settings({ onClose }: SettingsProps) {
               >
                 Google AI Studio
               </a>
-              からキーを取得
+              {language === 'ja' ? 'からキーを取得' : ' - Get API Key'}
             </p>
           </div>
 
           {message && (
             <div
-              className={`px-4 py-3 rounded-lg text-sm ${
-                message.type === 'success'
+              className={`px-4 py-3 rounded-lg text-sm ${message.type === 'success'
                   ? 'bg-green-50 text-green-700'
                   : 'bg-red-50 text-red-600'
-              }`}
+                }`}
             >
               {message.text}
             </div>
@@ -159,7 +190,7 @@ export function Settings({ onClose }: SettingsProps) {
               onClick={onClose}
               className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition"
             >
-              キャンセル
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -169,10 +200,10 @@ export function Settings({ onClose }: SettingsProps) {
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  保存中...
+                  {t('common.saving')}
                 </>
               ) : (
-                '設定を保存'
+                t('common.save')
               )}
             </button>
           </div>

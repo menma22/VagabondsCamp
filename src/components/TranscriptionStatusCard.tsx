@@ -1,5 +1,6 @@
 import { CheckCircle, XCircle, Loader2, Clock, Download, RefreshCw } from 'lucide-react';
 import { formatFileSize } from '../lib/audioUpload';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface TranscriptionStatusCardProps {
     status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -18,6 +19,7 @@ export function TranscriptionStatusCard({
     onRetry,
     onDownload,
 }: TranscriptionStatusCardProps) {
+    const { t } = useLanguage();
     // 音声データがない場合は何も表示しない
     if (!audioUrl) {
         return null;
@@ -32,8 +34,8 @@ export function TranscriptionStatusCard({
                     textColor: 'text-white',
                     iconColor: 'text-white',
                     bgOpacity: 'bg-white/30',
-                    title: '✅ 文字起こし完了',
-                    message: '音声データは正常に処理されました',
+                    title: t('transcriptionStatus.completedTitle'),
+                    message: t('transcriptionStatus.completedMessage'),
                 };
             case 'failed':
                 return {
@@ -42,8 +44,8 @@ export function TranscriptionStatusCard({
                     textColor: 'text-white',
                     iconColor: 'text-white',
                     bgOpacity: 'bg-white/30',
-                    title: '❌ 文字起こし失敗',
-                    message: error || '不明なエラーが発生しました',
+                    title: t('transcriptionStatus.failedTitle'),
+                    message: error || t('transcriptionStatus.failedMessage'),
                 };
             case 'processing':
                 return {
@@ -52,8 +54,8 @@ export function TranscriptionStatusCard({
                     textColor: 'text-white',
                     iconColor: 'text-white',
                     bgOpacity: 'bg-white/30',
-                    title: '🔵 処理中...',
-                    message: '音声データを文字起こし中です',
+                    title: t('transcriptionStatus.processingTitle'),
+                    message: t('transcriptionStatus.processingMessage'),
                 };
             case 'pending':
                 return {
@@ -62,8 +64,8 @@ export function TranscriptionStatusCard({
                     textColor: 'text-white',
                     iconColor: 'text-white',
                     bgOpacity: 'bg-white/30',
-                    title: '⏳ 保留中',
-                    message: '処理待機中です',
+                    title: t('transcriptionStatus.pendingTitle'),
+                    message: t('transcriptionStatus.pendingMessage'),
                 };
         }
     };
@@ -93,7 +95,7 @@ export function TranscriptionStatusCard({
 
                         {audioSize && (
                             <p className={`${config.textColor} opacity-75 text-sm mb-3`}>
-                                ファイルサイズ: {formatFileSize(audioSize)}
+                                {t('transcriptionStatus.fileSize')}: {formatFileSize(audioSize)}
                             </p>
                         )}
 
@@ -104,7 +106,7 @@ export function TranscriptionStatusCard({
                                     className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm text-red-600 rounded-lg hover:bg-white transition font-medium"
                                 >
                                     <RefreshCw className="w-4 h-4" />
-                                    再試行
+                                    {t('transcriptionStatus.retry')}
                                 </button>
                             )}
 
@@ -114,7 +116,7 @@ export function TranscriptionStatusCard({
                                     className="flex items-center gap-2 px-4 py-2 bg-white/30 backdrop-blur-sm text-white rounded-lg hover:bg-white/40 transition"
                                 >
                                     <Download className="w-4 h-4" />
-                                    音声をダウンロード
+                                    {t('transcriptionStatus.download')}
                                 </button>
                             )}
                         </div>
