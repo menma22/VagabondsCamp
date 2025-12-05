@@ -294,7 +294,7 @@ export function Calendar({ onClose, onSelectMeeting }: CalendarProps) {
             <h2 className="text-xl font-semibold text-slate-900 flex items-baseline gap-1">
               <span>{currentDate.getFullYear()}{t('calendar.year')}{currentDate.getMonth() + 1}{t('calendar.month')}</span>
               <span className="text-3xl font-bold">{currentDate.getDate()}{t('calendar.day')}</span>
-              <span>({(t('monthView.weekDays') as string[])[currentDate.getDay()]})</span>
+              <span>({(t('monthView.weekDays') as unknown as string[])[currentDate.getDay()]})</span>
             </h2>
           )}
         </div>

@@ -1,10 +1,14 @@
 import { createContext, useContext, useRef, useState, ReactNode } from 'react';
 
+// 録音モードの型定義
+export type RecordingMode = 'microphone' | 'system' | 'both';
+
 interface RecordingContextType {
   isRecording: boolean;
   recordingTime: number;
   recordingMeetingId: string | null;
-  startRecording: (meetingId: string, onAutoStop?: () => void) => Promise<void>;
+  recordingMode: RecordingMode;
+  startRecording: (meetingId: string, mode?: RecordingMode, onAutoStop?: () => void) => Promise<void>;
   stopRecording: () => Promise<Blob[]>;
   getRecordingState: () => { isRecording: boolean; recordingTime: number; meetingId: string | null };
 }
@@ -15,16 +19,18 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingMeetingId, setRecordingMeetingId] = useState<string | null>(null);
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('microphone');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const segmentsRef = useRef<Blob[]>([]);
-  const segmentTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const segmentTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const displayStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSoundTimeRef = useRef<number>(Date.now());
   const autoStopCallbackRef = useRef<(() => void) | null>(null);
 
@@ -80,27 +86,111 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const startRecording = async (meetingId: string, onAutoStop?: () => void) => {
+  const startRecording = async (
+    meetingId: string,
+    mode: RecordingMode = 'both',
+    onAutoStop?: () => void
+  ) => {
     if (isRecording) {
       throw new Error('すでに録音中です');
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream);
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      const destination = audioContext.createMediaStreamDestination();
+
+      // マイク入力を取得（microphoneまたはbothモード）
+      if (mode === 'microphone' || mode === 'both') {
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        micSource.connect(destination);
+
+        // マイクストリームを保持（後でstopするため）
+        if (mode === 'microphone') {
+          streamRef.current = micStream;
+        } else {
+          // bothモードの場合、マイクストリームも保持
+          displayStreamRef.current = micStream;
+        }
+      }
+
+      // システム音声を取得（systemまたはbothモード）
+      if (mode === 'system' || mode === 'both') {
+        try {
+          const displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { width: 1, height: 1 }, // ビデオは最小サイズ
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            }
+          });
+
+          const audioTracks = displayStream.getAudioTracks();
+
+          if (audioTracks.length > 0) {
+            const systemAudioStream = new MediaStream([audioTracks[0]]);
+            const systemSource = audioContext.createMediaStreamSource(systemAudioStream);
+            systemSource.connect(destination);
+            console.log('システム音声を取得しました');
+          } else {
+            console.warn('システム音声が選択されていません。「システム音声も共有する」をオンにしてください。');
+          }
+
+          // ビデオトラックを停止（不要なので）
+          displayStream.getVideoTracks().forEach(track => track.stop());
+
+          // displayStreamを保持
+          if (mode === 'system') {
+            streamRef.current = displayStream;
+          } else {
+            // bothモードの場合、両方を合わせる
+            if (displayStreamRef.current) {
+              // マイクとシステム音声を統合したストリームを作成
+              const combinedTracks = [
+                ...displayStreamRef.current.getAudioTracks(),
+                ...displayStream.getAudioTracks()
+              ];
+              displayStreamRef.current = new MediaStream(combinedTracks);
+            }
+          }
+        } catch (error) {
+          console.error('画面共有がキャンセルされました:', error);
+          // マイクモードにフォールバック（bothモードの場合）
+          if (mode === 'both') {
+            console.log('マイクのみで録音を続行します');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // ミックスされた音声ストリーム
+      const mixedStream = destination.stream;
+      streamRef.current = mixedStream;
+
+      const mediaRecorder = new MediaRecorder(mixedStream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       segmentsRef.current = [];
       autoStopCallbackRef.current = onAutoStop || null;
       lastSoundTimeRef.current = Date.now();
+      setRecordingMode(mode);
 
-      const audioContext = new AudioContext();
-      audioContextRef.current = audioContext;
-      const source = audioContext.createMediaStreamSource(stream);
+      // 音声レベル解析用
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       analyserRef.current = analyser;
+
+      const source = audioContext.createMediaStreamSource(mixedStream);
       source.connect(analyser);
 
       mediaRecorder.ondataavailable = (e) => {
@@ -120,7 +210,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
 
       segmentTimerRef.current = setInterval(() => {
         startNewSegment();
-      }, 15 * 60 * 1000);
+      }, 30 * 60 * 1000);
 
       silenceTimerRef.current = setInterval(() => {
         checkAudioLevel();
@@ -151,6 +241,11 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((track) => track.stop());
             streamRef.current = null;
+          }
+
+          if (displayStreamRef.current) {
+            displayStreamRef.current.getTracks().forEach((track) => track.stop());
+            displayStreamRef.current = null;
           }
 
           if (timerRef.current) {
@@ -209,6 +304,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
         isRecording,
         recordingTime,
         recordingMeetingId,
+        recordingMode,
         startRecording,
         stopRecording,
         getRecordingState,

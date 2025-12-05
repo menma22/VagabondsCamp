@@ -166,11 +166,10 @@ ${transcript}
                   </div>
                 )}
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-                    message.role === 'user'
+                  className={`max-w-[75%] rounded-2xl px-4 py-3 ${message.role === 'user'
                       ? 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white'
                       : 'bg-white shadow-md text-slate-900'
-                  }`}
+                    }`}
                 >
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                 </div>
