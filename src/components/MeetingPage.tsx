@@ -10,6 +10,7 @@ import { AIChat } from './AIChat';
 import { ActionItems } from './ActionItems';
 import { DecisionItems } from './DecisionItems';
 import { SharedInformation } from './SharedInformation';
+import { RecordingGuideModal } from './RecordingGuideModal';
 import {
   ArrowLeft,
   Mic,
@@ -26,7 +27,9 @@ import {
 interface MeetingPageProps {
   meetingId: string;
   onClose: () => void;
+
   onRetryTranscription?: (meetingId: string) => Promise<void>;
+  autoStartRecording?: boolean;
 }
 
 interface TodoItem {
@@ -67,7 +70,7 @@ interface MeetingData {
   transcription_error: string | null;
 }
 
-export function MeetingPage({ meetingId, onClose, onRetryTranscription }: MeetingPageProps) {
+export function MeetingPage({ meetingId, onClose, onRetryTranscription, autoStartRecording = false }: MeetingPageProps) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const { isRecording, recordingTime, recordingMeetingId, startRecording, stopRecording } = useRecording();
@@ -92,7 +95,9 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [newUrlTitle, setNewUrlTitle] = useState('');
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showRecordingGuide, setShowRecordingGuide] = useState(false);
 
   const isRecordingThisMeeting = isRecording && recordingMeetingId === meetingId;
 
@@ -106,6 +111,12 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       }
     };
   }, [meetingId]);
+
+  useEffect(() => {
+    if (autoStartRecording && !isRecording) {
+      handleStartRecording();
+    }
+  }, [autoStartRecording]);
 
   useEffect(() => {
     if (!loading && meeting.title !== undefined) {
@@ -241,11 +252,20 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
       return;
     }
 
+    setShowRecordingGuide(true);
+  };
+
+  const handleStartRecordingFromGuide = async () => {
+    setShowRecordingGuide(false);
     try {
-      await startRecording(meetingId);
-    } catch (error) {
+      await startRecording(meetingId, 'both');
+    } catch (error: any) {
       console.error('Error starting recording:', error);
-      alert(t('home.startRecordingError'));
+      if (error.message === 'SYSTEM_AUDIO_MISSING') {
+        alert('システム音声が選択されませんでした。「システムオーディオも共有」にチェックを入れて、もう一度お試しください。');
+      } else {
+        alert(t('home.startRecordingError'));
+      }
     }
   };
 
@@ -1054,6 +1074,13 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription }: Meetin
           <AIChat transcript={meeting.transcript} geminiApiKey={geminiApiKey} />
         )}
       </div>
+      {showRecordingGuide && (
+        <RecordingGuideModal
+          isOpen={showRecordingGuide}
+          onClose={() => setShowRecordingGuide(false)}
+          onConfirm={handleStartRecordingFromGuide}
+        />
+      )}
     </div>
   );
 }

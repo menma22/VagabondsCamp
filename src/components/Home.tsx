@@ -39,6 +39,7 @@ export function Home() {
   const [processingStep, setProcessingStep] = useState('');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [autoStartRecording, setAutoStartRecording] = useState(false);
 
   useEffect(() => {
     loadMeetings();
@@ -169,10 +170,7 @@ export function Home() {
 
       if (error) throw error;
 
-      await startRecording(newMeeting.id, () => {
-        alert(t('home.autoStopMessage'));
-        handleStopRecording();
-      });
+      setAutoStartRecording(true);
       setSelectedMeetingId(newMeeting.id);
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -664,9 +662,11 @@ export function Home() {
         meetingId={selectedMeetingId}
         onClose={() => {
           setSelectedMeetingId(null);
+          setAutoStartRecording(false);
           loadMeetings();
         }}
         onRetryTranscription={retryTranscription}
+        autoStartRecording={autoStartRecording}
       />
     );
   }

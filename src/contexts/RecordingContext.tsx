@@ -142,7 +142,10 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
             systemSource.connect(destination);
             console.log('システム音声を取得しました');
           } else {
-            console.warn('システム音声が選択されていません。「システム音声も共有する」をオンにしてください。');
+            console.warn('システム音声が選択されていません');
+            // ビデオトラックを停止
+            displayStream.getVideoTracks().forEach(track => track.stop());
+            throw new Error('SYSTEM_AUDIO_MISSING');
           }
 
           // ビデオトラックを停止（不要なので）
