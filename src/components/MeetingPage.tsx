@@ -93,6 +93,7 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription, autoStar
   const [processing, setProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [newUrlTitle, setNewUrlTitle] = useState('');
 
@@ -113,10 +114,10 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription, autoStar
   }, [meetingId]);
 
   useEffect(() => {
-    if (autoStartRecording && !isRecording) {
+    if (autoStartRecording && !isRecording && apiKeyLoaded) {
       handleStartRecording();
     }
-  }, [autoStartRecording]);
+  }, [autoStartRecording, apiKeyLoaded]);
 
   useEffect(() => {
     if (!loading && meeting.title !== undefined) {
@@ -139,6 +140,8 @@ export function MeetingPage({ meetingId, onClose, onRetryTranscription, autoStar
       }
     } catch (error) {
       console.error('Error loading API key:', error);
+    } finally {
+      setApiKeyLoaded(true);
     }
   };
 
