@@ -21,3 +21,11 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# env files (never commit real values)
+.env.development
+.env.production
+.env*.local
+
+# local build logs
+build_log.txt
